@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -m pip:*)",
+      "Bash(python3:*)",
+      "Bash(pip3 install:*)",
+      "Bash(/Users/samuel/Library/Python/3.9/bin/streamlit run web_app.py)",
+      "Bash(/Users/samuel/Library/Python/3.9/bin/streamlit run web_app.py --server.headless true)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}
