@@ -112,17 +112,29 @@ class ExcelReader:
             print(f"Error loading sheet '{sheet_name}': {e}")
             return None
 
-        # Find matching PO
-        # Clean PO number for matching
+        # Find matching PO using vectorized operations (much faster than iterrows)
         po_clean = str(po_number).strip().upper()
 
-        # Search for PO in the DataFrame
-        for idx, row in df.iterrows():
-            row_po = str(row.get('PO', '')).strip().upper()
-            if row_po == po_clean:
-                return self._row_to_po_record(row, sheet_name, idx)
+        # Create normalized PO column for matching
+        if 'PO' not in df.columns:
+            return None
 
-        return None
+        df['_po_normalized'] = df['PO'].fillna('').astype(str).str.strip().str.upper()
+
+        # Find matching rows
+        matches = df[df['_po_normalized'] == po_clean]
+
+        if matches.empty:
+            return None
+
+        # Get first match
+        idx = matches.index[0]
+        row = matches.iloc[0]
+
+        # Clean up temporary column
+        df.drop('_po_normalized', axis=1, inplace=True)
+
+        return self._row_to_po_record(row, sheet_name, idx)
 
     def _row_to_po_record(self, row: pd.Series, sheet_name: str, row_index: int) -> PORecord:
         """

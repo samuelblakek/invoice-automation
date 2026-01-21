@@ -40,14 +40,11 @@ def identify_supplier(pdf_path: Path, first_page_text: str) -> str:
         return 'GENERIC'
 
 
-def extract_invoice(pdf_path: Path):
-    """Extract invoice from PDF."""
-    with pdfplumber.open(pdf_path) as pdf:
-        first_page_text = pdf.pages[0].extract_text() if pdf.pages else ""
-
-    supplier_type = identify_supplier(pdf_path, first_page_text)
-
-    extractors = {
+# Cache extractors to avoid recreating them for each invoice
+@st.cache_resource
+def get_extractors():
+    """Get cached extractor instances."""
+    return {
         'AAW': AAWExtractor(),
         'CJL': CJLExtractor(),
         'AMAZON': AmazonExtractor(),
@@ -56,7 +53,15 @@ def extract_invoice(pdf_path: Path):
         'GENERIC': GenericExtractor(),
     }
 
-    extractor = extractors.get(supplier_type, GenericExtractor())
+
+def extract_invoice(pdf_path: Path):
+    """Extract invoice from PDF."""
+    with pdfplumber.open(pdf_path) as pdf:
+        first_page_text = pdf.pages[0].extract_text() if pdf.pages else ""
+
+    supplier_type = identify_supplier(pdf_path, first_page_text)
+    extractors = get_extractors()
+    extractor = extractors.get(supplier_type, extractors['GENERIC'])
     return extractor.extract(pdf_path)
 
 
@@ -158,7 +163,6 @@ with tab1:
         process_button = st.button(
             "🚀 Process Invoices",
             type="primary",
-            use_container_width=True,
             disabled=not (invoice_pdfs and maintenance_po and cost_centre)
         )
 
@@ -196,9 +200,13 @@ with tab1:
                 progress_bar = st.progress(0)
                 status_text = st.empty()
 
-                for i, pdf_file in enumerate(pdf_dir.glob("*.pdf")):
+                # Get list of PDFs once for efficiency
+                pdf_files = list(pdf_dir.glob("*.pdf"))
+                total_pdfs = len(pdf_files)
+
+                for i, pdf_file in enumerate(pdf_files):
                     status_text.text(f"Processing {pdf_file.name}...")
-                    progress_bar.progress((i + 1) / len(list(pdf_dir.glob("*.pdf"))))
+                    progress_bar.progress((i + 1) / total_pdfs)
 
                     try:
                         invoice = extract_invoice(pdf_file)
@@ -291,7 +299,7 @@ with tab1:
                     "Issues": ", ".join(result.errors[:2]) if result.errors else "None"
                 })
 
-        st.dataframe(table_data, use_container_width=True)
+        st.dataframe(table_data, width="stretch")
 
         # Download section
         st.header("Step 4: Download Results")
@@ -304,8 +312,7 @@ with tab1:
                 data=st.session_state['updated_excel'].getvalue(),
                 file_name=f"Maintenance_POs_Updated_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                type="primary",
-                use_container_width=True
+                type="primary"
             )
 
         with col2:
@@ -313,8 +320,7 @@ with tab1:
                 label="📄 Download CSV Summary",
                 data=st.session_state['csv_content'],
                 file_name=f"invoice_summary_{datetime.now().strftime('%Y%m%d')}.csv",
-                mime="text/csv",
-                use_container_width=True
+                mime="text/csv"
             )
 
         with col3:
@@ -322,8 +328,7 @@ with tab1:
                 label="📝 Download Detailed Report",
                 data=st.session_state['report_content'],
                 file_name=f"invoice_report_{datetime.now().strftime('%Y%m%d')}.txt",
-                mime="text/plain",
-                use_container_width=True
+                mime="text/plain"
             )
 
         # Show issues if any
