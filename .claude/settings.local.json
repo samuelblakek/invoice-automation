@@ -7,7 +7,16 @@
       "Bash(/Users/samuel/Library/Python/3.9/bin/streamlit run web_app.py)",
       "Bash(/Users/samuel/Library/Python/3.9/bin/streamlit run web_app.py --server.headless true)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(gh repo create:*)",
+      "Bash(git push)",
+      "Bash(git -C /Users/samuel/Documents/claude-code/retail-support-automate-invoices log --oneline --all)",
+      "Bash(for f in QUICK_START.md SETUP_GUIDE.md DEPLOYMENT_GUIDE.md DEPLOYMENT_SUMMARY.md HOW_THE_APP_WORKS.md AMOUNT_EXTRACTION_FIXES.md)",
+      "Bash(do [ -f \"$f\" ])",
+      "Bash(echo:*)",
+      "Bash(done)",
+      "Bash([ -f CLAUDE.md ])"
     ]
   }
 }

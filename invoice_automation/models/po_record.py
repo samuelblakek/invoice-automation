@@ -46,6 +46,7 @@ class PORecord:
     nominal_code: Optional[str] = None
     brand: Optional[str] = None
     ticket_no: Optional[str] = None
+    company_name: Optional[str] = None
 
     def __repr__(self) -> str:
         return (

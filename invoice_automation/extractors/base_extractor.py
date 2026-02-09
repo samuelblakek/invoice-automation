@@ -200,7 +200,6 @@ class BaseExtractor(ABC):
         """
         required_fields = {
             'invoice_number': invoice.invoice_number,
-            'po_number': invoice.po_number,
             'net_amount': invoice.net_amount,
         }
 

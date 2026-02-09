@@ -36,6 +36,18 @@ def identify_supplier(pdf_path: Path, first_page_text: str) -> str:
         return 'APS'
     elif 'compco' in filename_lower or 'compco fire' in text_lower:
         return 'COMPCO'
+    elif 'sunbelt' in text_lower or 'sunbelt' in filename_lower:
+        return 'SUNBELT'
+    elif 'maxwell jones' in text_lower or 'maxwelljones' in text_lower:
+        return 'MAXWELL_JONES'
+    elif 'metro security' in text_lower:
+        return 'METRO_SECURITY'
+    elif 'store maintenance' in text_lower or 'reactive on call' in text_lower:
+        return 'STORE_MAINTENANCE'
+    elif 'lampshoponline' in text_lower or 'lampshop' in text_lower:
+        return 'LAMPSHOP'
+    elif 'ilux' in text_lower:
+        return 'ILUX'
     else:
         return 'GENERIC'
 
@@ -51,6 +63,12 @@ def get_extractors():
         'APS': APSExtractor(),
         'COMPCO': GenericExtractor(),
         'GENERIC': GenericExtractor(),
+        'SUNBELT': GenericExtractor(),
+        'MAXWELL_JONES': GenericExtractor(),
+        'METRO_SECURITY': GenericExtractor(),
+        'STORE_MAINTENANCE': GenericExtractor(),
+        'LAMPSHOP': GenericExtractor(),
+        'ILUX': GenericExtractor(),
     }
 
 
@@ -293,7 +311,7 @@ with tab1:
                     "Status": status_icon,
                     "Invoice #": result.invoice.invoice_number,
                     "Supplier": result.invoice.supplier_name,
-                    "PO #": result.invoice.po_number,
+                    "PO #": result.invoice.po_number or "No PO",
                     "Store": result.invoice.store_location,
                     "Amount": f"£{result.invoice.net_amount:.2f}",
                     "Issues": ", ".join(result.errors[:2]) if result.errors else "None"

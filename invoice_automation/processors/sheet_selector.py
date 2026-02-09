@@ -17,6 +17,13 @@ class SheetSelector:
         'AURA': 'AURA AC',
         'STORE_MAINTENANCE': 'STORE MAINTENANCE',
         'OTHER': 'OTHER',
+        'GENERIC': 'OTHER',
+        # New suppliers
+        'SUNBELT': 'OTHER',
+        'MAXWELL_JONES': 'OTHER',
+        'METRO_SECURITY': 'OTHER',
+        'ILUX': 'OTHER',
+        'LAMPSHOP': 'ORDERS',
     }
 
     @staticmethod
@@ -38,6 +45,6 @@ class SheetSelector:
         Get list of all maintenance PO sheets.
 
         Returns:
-            List of sheet names
+            List of unique sheet names
         """
-        return list(SheetSelector.SUPPLIER_SHEET_MAP.values())
+        return list(set(SheetSelector.SUPPLIER_SHEET_MAP.values()))
