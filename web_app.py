@@ -10,7 +10,6 @@ from datetime import datetime
 import pandas as pd
 import io
 
-from invoice_automation.config.settings import Config
 from invoice_automation.processors import ExcelReader, ExcelWriter
 from invoice_automation.validators import InvoiceValidator
 from invoice_automation.extractors import (

@@ -13,13 +13,6 @@ streamlit run web_app.py
 
 The web app opens at `http://localhost:8501`. Upload invoice PDFs and the two Excel files (Maintenance POs + Cost Centre Summary), click Process, and download the updated spreadsheet.
 
-A CLI alternative is also available:
-
-```bash
-python main.py process --input-dir ./invoices_to_process
-python main.py process --input-dir ./invoices_to_process --dry-run  # preview only
-```
-
 ## How It Works
 
 ```
@@ -38,10 +31,8 @@ All processing happens in memory. No files are stored on disk or on the server.
 
 ```
 retail-support-automate-invoices/
-├── web_app.py                    # Streamlit web interface (primary entry point)
-├── main.py                       # CLI alternative
+├── web_app.py                    # Streamlit web interface (entry point)
 ├── requirements.txt              # Python dependencies
-├── config.yaml                   # Configuration
 ├── invoice_automation/           # Core package
 │   ├── extractors/               # PDF data extraction
 │   │   ├── generic_extractor.py  # Multi-pattern extractor (handles any supplier)
@@ -54,8 +45,7 @@ retail-support-automate-invoices/
 │   ├── validators/               # PO matching, authorization checks
 │   ├── models/                   # Data classes (InvoiceData, PORecord)
 │   ├── utils/                    # Amount parsing, text normalization
-│   ├── reports/                  # CSV and text report generation
-│   └── config/                   # YAML config loading
+│   └── reports/                  # CSV and text report generation
 ├── example-files/                # Test PDFs and Excel files
 ├── docs/                         # Documentation
 │   ├── deployment.md             # Deployment & hosting guide
@@ -78,7 +68,7 @@ retail-support-automate-invoices/
 ## Documentation
 
 - [Deployment Guide](docs/deployment.md) — Streamlit Cloud setup, local testing, alternative hosting, security
-- [User Guide](docs/user-guide.md) — Web app and CLI workflow, validation checks, troubleshooting
+- [User Guide](docs/user-guide.md) — Web app workflow, validation checks, troubleshooting
 
 ## License
 

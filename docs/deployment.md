@@ -26,7 +26,7 @@ Free hosting, zero installation for end users, HTTPS encrypted.
 1. Create a GitHub account at https://github.com (if you don't have one)
 2. Create a new **private** repository named `invoice-automation`
 3. Upload the project files using GitHub Desktop or the web interface:
-   - `web_app.py`, `main.py`, `requirements.txt`, `config.yaml`
+   - `web_app.py`, `requirements.txt`
    - `invoice_automation/` (entire folder)
    - Do **not** upload `example-files/` with real invoice data
 

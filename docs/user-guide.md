@@ -43,48 +43,6 @@ The automation cannot do these:
 
 ---
 
-## CLI Workflow
-
-For advanced users who prefer the command line.
-
-### Setup
-
-```bash
-pip install -r requirements.txt
-```
-
-Configure file paths in `config.yaml`:
-
-```yaml
-paths:
-  maintenance_workbook: "/path/to/Maintenance POs.xlsx"
-  cost_centre_summary: "/path/to/Cost Centre Summary.xlsx"
-  invoices_input_dir: "./invoices_to_process"
-  output_dir: "./output"
-```
-
-### Process Invoices
-
-```bash
-# Copy PDFs into invoices_to_process/
-python main.py process --input-dir ./invoices_to_process
-
-# Preview only (no Excel changes)
-python main.py process --input-dir ./invoices_to_process --dry-run
-```
-
-### Check Results
-
-Reports are saved to `output/`:
-- `invoice_summary_YYYYMMDD.csv` — open in Excel
-- `invoice_report_YYYYMMDD.txt` — detailed text report
-
-### Clean Up
-
-Delete or move processed PDFs from `invoices_to_process/` after each run.
-
----
-
 ## What Gets Updated
 
 Only 3 columns in matching PO rows:

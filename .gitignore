@@ -35,10 +35,6 @@ wheels/
 Thumbs.db
 
 # Project specific
-output/
-backups/
-invoices_to_process/
-*.backup.xlsx
 .streamlit/secrets.toml
 
 # Keep example files but ignore real data

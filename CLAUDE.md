@@ -2,9 +2,7 @@
 
 ## Architecture
 
-**Entry points:**
-- `web_app.py` — Streamlit web interface (primary)
-- `main.py` — CLI alternative
+**Entry point:** `web_app.py` — Streamlit web interface
 
 **Package structure** (`invoice_automation/`):
 - `extractors/` — PDF data extraction (generic + supplier-specific)
@@ -16,7 +14,6 @@
 - `models/` — Data classes: `InvoiceData`, `PORecord`, `ValidationResult`
 - `utils/` — Helpers (amount parsing, text normalization)
 - `reports/` — Report generation (CSV summary, text report)
-- `config/` — YAML configuration loading
 
 ## How to Run
 
@@ -27,11 +24,7 @@ streamlit run web_app.py
 
 ## How to Test
 
-Process example PDFs in `example-files/` against the test Excel file (`Maintenance PO's - TEST.xlsx`). All 7 test invoices should extract and match correctly.
-
-```bash
-python main.py process --input-dir example-files --dry-run
-```
+Process example PDFs in `example-files/` against the test Excel file (`Maintenance PO's - TEST.xlsx`) via the web app. Upload the PDFs and Excel files, click Process, and verify all 7 test invoices extract and match correctly.
 
 ## Key Patterns
 
