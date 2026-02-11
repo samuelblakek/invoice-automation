@@ -291,21 +291,86 @@ def inv_card_html(inv, po=None, extra="", accent="var(--border-subtle)"):
     </div>'''
 
 
-def lookup_nominal_code(supplier_name: str, mapping: dict) -> str:
-    """Find nominal code for supplier using case-insensitive substring matching."""
-    if not supplier_name or not mapping:
+def lookup_nominal_code(supplier_name: str, rows: list[dict],
+                        invoice_text: str = "") -> str:
+    """Find nominal code for supplier, using invoice text to disambiguate
+    when a supplier has multiple codes for different work types.
+
+    The Supplier field in the mapping may contain a work-type suffix after
+    a dash, e.g. "Metro Security (UK) Limited (MetSafe) - safe installation".
+    The base name is the part before the first " - ".
+
+    Steps:
+    1. Find all rows whose base supplier name matches the invoice supplier.
+    2. If only one match, return that code.
+    3. If multiple matches (different work types), score each by how many
+       words from the work-type description appear in the invoice text.
+       Return the best-scoring code.
+    4. If no match on base name, try first-word fallback.
+    """
+    if not supplier_name or not rows:
         return ""
+
     supplier_lower = supplier_name.lower()
-    for key, code in mapping.items():
-        if key in supplier_lower or supplier_lower in key:
-            return code
-    # Try matching on first word (e.g. "CJL" from "CJL Group Ltd")
-    first_word = supplier_lower.split()[0] if supplier_lower.split() else ""
-    if first_word and len(first_word) >= 3:
-        for key, code in mapping.items():
-            if first_word in key or key.startswith(first_word):
-                return code
-    return ""
+    invoice_lower = invoice_text.lower() if invoice_text else ""
+
+    def base_name(entry: str) -> str:
+        return entry.split(" - ")[0].strip()
+
+    def work_desc(entry: str) -> str:
+        parts = entry.split(" - ", 1)
+        return parts[1].strip() if len(parts) > 1 else ""
+
+    def name_matches(entry_base: str, supplier: str) -> bool:
+        return entry_base in supplier or supplier in entry_base
+
+    # Collect all matching rows
+    matches = []
+    for row in rows:
+        entry = str(row.get("Supplier", "")).strip()
+        code = str(row.get("Nominal Code", "")).strip()
+        if not entry or not code:
+            continue
+        entry_lower = entry.lower()
+        entry_base = base_name(entry_lower)
+        if name_matches(entry_base, supplier_lower):
+            matches.append((entry_lower, code, work_desc(entry_lower)))
+
+    if not matches:
+        # First-word fallback
+        first_word = supplier_lower.split()[0] if supplier_lower.split() else ""
+        if first_word and len(first_word) >= 3:
+            for row in rows:
+                entry = str(row.get("Supplier", "")).strip()
+                code = str(row.get("Nominal Code", "")).strip()
+                if not entry or not code:
+                    continue
+                entry_base = base_name(entry.lower())
+                if first_word in entry_base or entry_base.startswith(first_word):
+                    matches.append((entry.lower(), code, work_desc(entry.lower())))
+        if not matches:
+            return ""
+
+    # Single match — return directly
+    if len(matches) == 1:
+        return matches[0][1]
+
+    # Multiple matches — score by work description overlap with invoice text
+    if not invoice_lower:
+        return matches[0][1]  # No invoice text to compare, return first
+
+    best_code = matches[0][1]
+    best_score = -1
+    for _entry, code, desc in matches:
+        if not desc:
+            continue
+        words = [w for w in desc.split() if len(w) >= 3]
+        score = sum(1 for w in words if w in invoice_lower)
+        if score > best_score:
+            best_score = score
+            best_code = code
+
+    return best_code
 
 
 NOMINAL_CODES_PATH = Path(__file__).parent / "data" / "nominal_codes.json"
@@ -604,20 +669,15 @@ if process_button and all_files_uploaded:
             progress_bar.empty()
             status_text.empty()
 
-            # Build nominal code lookup dict from session state
-            nominal_mapping = {}
-            for row in st.session_state.get('nominal_mapping_rows', []):
-                supplier = str(row.get('Supplier', '')).strip()
-                code = str(row.get('Nominal Code', '')).strip()
-                if supplier and code:
-                    nominal_mapping[supplier.lower()] = code
-
             # Write auto-updated results to Excel
+            nominal_rows = st.session_state.get('nominal_mapping_rows', [])
             with ExcelWriter(maintenance_path, create_backup=False) as writer:
                 for result in results:
                     if result.can_auto_update:
+                        inv = result.invoice
                         nom_code = lookup_nominal_code(
-                            result.invoice.supplier_name, nominal_mapping
+                            inv.supplier_name, nominal_rows,
+                            invoice_text=f"{inv.description} {inv.raw_text}"
                         )
                         writer.update_po_record(
                             result.po_record.sheet_name,
@@ -746,13 +806,7 @@ if st.session_state.get('processed'):
 
     # If there are confirmed items that need writing, rebuild the Excel
     if confirmed_indices and all_reviewed and not st.session_state.get('reviews_written'):
-        # Build nominal code lookup dict from session state
-        nominal_mapping = {}
-        for row in st.session_state.get('nominal_mapping_rows', []):
-            supplier = str(row.get('Supplier', '')).strip()
-            code = str(row.get('Nominal Code', '')).strip()
-            if supplier and code:
-                nominal_mapping[supplier.lower()] = code
+        nominal_rows = st.session_state.get('nominal_mapping_rows', [])
 
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -762,8 +816,10 @@ if st.session_state.get('processed'):
             with ExcelWriter(maintenance_path, create_backup=False) as writer:
                 for idx in confirmed_indices:
                     result = review_results[idx]
+                    inv = result.invoice
                     nom_code = lookup_nominal_code(
-                        result.invoice.supplier_name, nominal_mapping
+                        inv.supplier_name, nominal_rows,
+                        invoice_text=f"{inv.description} {inv.raw_text}"
                     )
                     writer.update_po_record(
                         result.po_record.sheet_name,
