@@ -4,11 +4,8 @@ Simple drag-and-drop interface for invoice processing
 """
 import streamlit as st
 import tempfile
-import shutil
 from pathlib import Path
 from datetime import datetime
-import pandas as pd
-import io
 
 from invoice_automation.processors import ExcelReader, ExcelWriter
 from invoice_automation.validators import InvoiceValidator
@@ -18,6 +15,233 @@ from invoice_automation.extractors import (
 from invoice_automation.models import ValidationResult
 from invoice_automation.reports.report_generator import ReportGenerator
 import pdfplumber
+
+
+# ---------------------------------------------------------------------------
+# Global CSS -- Inter font, neutral dark palette, card/badge/button styles
+# ---------------------------------------------------------------------------
+GLOBAL_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* ---------- Font override ---------- */
+html, body, [class*="css"], .stMarkdown, .stText,
+.stSelectbox, .stMultiSelect, .stRadio, .stCheckbox,
+h1, h2, h3, h4, h5, h6, p, div, label, input, textarea, button, a {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
+/* Apply Inter to spans, but NOT inside expander summaries where icon fonts live */
+span {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
+/* Restore icon font for expander toggle arrows -- higher specificity beats the span rule */
+[data-testid="stExpander"] summary span,
+[data-testid="stExpander"] [data-testid="stMarkdownContainer"] + div span,
+details summary span {
+    font-family: 'Material Symbols Rounded', sans-serif !important;
+}
+/* Also restore for any standalone icon use */
+.material-symbols-rounded,
+[data-baseweb="icon"],
+[data-baseweb="icon"] * {
+    font-family: 'Material Symbols Rounded', sans-serif !important;
+}
+
+/* ---------- Colour tokens ---------- */
+:root {
+    --bg-primary:    #111111;
+    --bg-card:       #1A1A1A;
+    --bg-card-hover: #222222;
+    --bg-elevated:   #262626;
+    --border-subtle: #2A2A2A;
+    --border-medium: #3A3A3A;
+    --text-primary:  #F0F0F0;
+    --text-secondary:#999999;
+    --text-muted:    #666666;
+    --accent:        #F0F0F0;
+    --green:         #34D399;
+    --green-bg:      #0F2518;
+    --green-border:  #166534;
+    --amber:         #FBBF24;
+    --amber-bg:      #2A2008;
+    --amber-border:  #713F12;
+    --red:           #F87171;
+    --red-bg:        #2A0F0F;
+    --red-border:    #7F1D1D;
+}
+
+/* ---------- Hide Streamlit branding ---------- */
+#MainMenu, footer { visibility: hidden; }
+/* Hide deploy button */
+[data-testid="stAppDeployButton"] { display: none; }
+/* Make header transparent so sidebar toggle remains accessible */
+header[data-testid="stHeader"] {
+    background: transparent !important;
+}
+/* Restore icon font for sidebar collapse/expand buttons */
+header[data-testid="stHeader"] button span,
+[data-testid="stSidebarCollapsedControl"] span,
+[data-testid="stSidebarCollapseButton"] button span,
+[data-testid="stBaseButton-headerNoPadding"] span {
+    font-family: 'Material Symbols Rounded', sans-serif !important;
+}
+
+/* ---------- Body background ---------- */
+.stApp { background-color: var(--bg-primary) !important; }
+
+/* ---------- Sidebar ---------- */
+section[data-testid="stSidebar"] {
+    background-color: var(--bg-card) !important;
+    border-right: 1px solid var(--border-subtle) !important;
+}
+
+/* ---------- Invoice card (shared) ---------- */
+.inv-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 1.1rem 1.4rem;
+    margin-bottom: 0.75rem;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.inv-card:hover {
+    border-color: var(--border-medium);
+    background: var(--bg-card-hover);
+}
+.inv-card .inv-num {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+}
+.inv-card .inv-supplier {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-top: 0.15rem;
+}
+.inv-card .inv-amount {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-top: 0.4rem;
+}
+.inv-card .inv-detail {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-top: 0.2rem;
+}
+.inv-card .inv-error {
+    color: var(--red);
+    font-size: 0.8rem;
+    margin-top: 0.3rem;
+}
+
+/* ---------- Column header pills ---------- */
+.col-header {
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-align: center;
+    margin-bottom: 1rem;
+    border: 1px solid;
+}
+.col-header-green  { background: var(--green-bg);  color: var(--green);  border-color: var(--green-border); }
+.col-header-amber  { background: var(--amber-bg);  color: var(--amber);  border-color: var(--amber-border); }
+.col-header-red    { background: var(--red-bg);    color: var(--red);    border-color: var(--red-border); }
+
+/* ---------- Compact inline metrics ---------- */
+.inline-metrics {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 1.5rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-subtle);
+}
+.inline-metric { font-size: 0.875rem; color: var(--text-secondary); }
+.inline-metric strong {
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 700;
+    margin-right: 0.3rem;
+}
+
+/* ---------- Section divider ---------- */
+.section-divider {
+    border: none;
+    border-top: 1px solid var(--border-subtle);
+    margin: 2rem 0;
+}
+
+/* ---------- Button overrides ---------- */
+/* Primary buttons: warm neutral (white bg, dark text) */
+button[data-testid="stBaseButton-primary"],
+button[kind="primary"] {
+    background-color: #F0F0F0 !important;
+    border: 1px solid #F0F0F0 !important;
+    color: #111111 !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 0.01em !important;
+    transition: background 0.15s ease !important;
+}
+button[data-testid="stBaseButton-primary"]:hover,
+button[kind="primary"]:hover {
+    background-color: #FFFFFF !important;
+    border-color: #FFFFFF !important;
+    color: #000000 !important;
+}
+
+/* Secondary buttons: ghost style */
+button[data-testid="stBaseButton-secondary"],
+button[kind="secondary"] {
+    background-color: transparent !important;
+    border: 1px solid var(--border-medium) !important;
+    color: var(--text-secondary) !important;
+    font-weight: 500 !important;
+    border-radius: 8px !important;
+    font-size: 0.85rem !important;
+    transition: all 0.15s ease !important;
+}
+button[data-testid="stBaseButton-secondary"]:hover,
+button[kind="secondary"]:hover {
+    border-color: var(--text-muted) !important;
+    color: var(--text-primary) !important;
+    background-color: var(--bg-elevated) !important;
+}
+
+/* Download buttons -- normalise height */
+[data-testid="stDownloadButton"] button {
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    min-height: 2.8rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+[data-testid="stDownloadButton"] button p {
+    margin: 0 !important;
+    line-height: 1.3 !important;
+    font-size: 0.82rem !important;
+}
+</style>
+"""
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def inv_card_html(inv, po=None, extra=""):
+    """Generate HTML for an invoice card."""
+    po_line = f'<div class="inv-detail">PO: {po.po_number}  |  {po.store}</div>' if po else ""
+    return f'''<div class="inv-card">
+        <div class="inv-num">{inv.invoice_number}</div>
+        <div class="inv-supplier">{inv.supplier_name}</div>
+        <div class="inv-amount">&pound;{inv.net_amount:.2f}</div>
+        <div class="inv-detail">Store: {inv.store_location}</div>
+        {po_line}{extra}
+    </div>'''
 
 
 def identify_supplier(pdf_path: Path, first_page_text: str) -> str:
@@ -51,7 +275,6 @@ def identify_supplier(pdf_path: Path, first_page_text: str) -> str:
         return 'GENERIC'
 
 
-# Cache extractors to avoid recreating them for each invoice
 @st.cache_resource
 def get_extractors():
     """Get cached extractor instances."""
@@ -82,319 +305,157 @@ def extract_invoice(pdf_path: Path):
     return extractor.extract(pdf_path)
 
 
-# Page config
+# ---------------------------------------------------------------------------
+# Page config + CSS injection
+# ---------------------------------------------------------------------------
 st.set_page_config(
     page_title="Invoice Automation",
     page_icon="📄",
     layout="wide"
 )
 
-# Title and description
-st.title("📄 Invoice Processing Automation")
-st.markdown("""
-Upload your invoice PDFs and Excel spreadsheets, and the automation will:
-- Extract invoice data from PDFs
-- Validate against Purchase Orders
-- Check £200+ quote authorization
-- Update your spreadsheet automatically
-- Generate detailed reports
+st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
 
-**No data is stored** - everything is processed in memory and deleted after you download.
-""")
 
-# Sidebar for instructions
+# ---------------------------------------------------------------------------
+# Sidebar -- file uploaders, process button, about/help
+# ---------------------------------------------------------------------------
 with st.sidebar:
-    st.header("📋 Quick Guide")
-    st.markdown("""
-    **Step 1:** Upload invoice PDFs
+    st.markdown("#### Upload Files")
 
-    **Step 2:** Upload Excel files:
-    - Maintenance PO spreadsheet
-    - Cost Centre Summary
+    invoice_pdfs = st.file_uploader(
+        "Invoice PDFs",
+        type=['pdf'],
+        accept_multiple_files=True,
+        help="Upload all invoice PDFs you want to process"
+    )
 
-    **Step 3:** Click "Process Invoices"
+    maintenance_po = st.file_uploader(
+        "Maintenance PO Spreadsheet",
+        type=['xlsx'],
+        help="Your Maintenance PO's Excel file"
+    )
 
-    **Step 4:** Download results
+    cost_centre = st.file_uploader(
+        "Cost Centre Summary",
+        type=['xlsx'],
+        help="Cost Centre Summary (Addresses & Nominal Codes)"
+    )
 
-    ---
+    st.markdown("")
+    all_files_uploaded = bool(invoice_pdfs and maintenance_po and cost_centre)
+    process_button = st.button(
+        "Process Invoices",
+        type="primary",
+        disabled=not all_files_uploaded,
+        use_container_width=True
+    )
 
-    **Security:**
-    - All processing in memory
-    - No data saved online
-    - HTTPS encrypted
-    - Session data auto-deleted
-    """)
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
-    st.info("💡 Tip: Process 10-20 invoices at a time for best results")
+    with st.expander("About"):
+        st.markdown("""
+Extracts invoice data from PDFs, validates against PO records, and updates
+the Maintenance PO spreadsheet automatically.
 
-# Create tabs
-tab1, tab2, tab3 = st.tabs(["🚀 Process Invoices", "📊 About", "❓ Help"])
+**What it does:**
+1. Extract data from invoice PDFs
+2. Find matching Purchase Order records
+3. Validate against company policies
+4. Update your Excel spreadsheet
+5. Generate detailed reports
 
-with tab1:
-    # File uploaders
-    st.header("Step 1: Upload Files")
+**Supported suppliers:** AAW, CJL, APS, Amazon, Compco, and others via generic extraction.
 
-    col1, col2 = st.columns(2)
+**Security:** All processing happens in your browser session. No data is stored on servers.
+        """)
 
-    with col1:
-        st.subheader("📄 Invoice PDFs")
-        invoice_pdfs = st.file_uploader(
-            "Drag and drop your invoice PDF files here",
-            type=['pdf'],
-            accept_multiple_files=True,
-            help="Upload all invoice PDFs you want to process"
-        )
+    with st.expander("Help"):
+        st.markdown("""
+**Common issues:**
+- **PO not found** -- Wrong Excel file or POs not yet created
+- **Amounts wrong** -- Amounts are NET (ex-VAT), which is correct
+- **Over £200 blocked** -- Check QUOTE OVER £200 and AUTHORISED columns
+- **Store mismatch** -- Fuzzy matching is used; low confidence flags for review
 
-        if invoice_pdfs:
-            st.success(f"✓ {len(invoice_pdfs)} invoice(s) uploaded")
-            with st.expander("View uploaded invoices"):
-                for pdf in invoice_pdfs:
-                    st.text(f"• {pdf.name}")
+**Weekly workflow:**
+1. Export invoices from iCompleat as PDFs
+2. Upload PDFs + both Excel files here
+3. Click Process Invoices
+4. Review flagged invoices
+5. Download updated Excel
+6. Approve in iCompleat
+        """)
 
-    with col2:
-        st.subheader("📊 Excel Spreadsheets")
 
-        maintenance_po = st.file_uploader(
-            "Maintenance PO Spreadsheet",
-            type=['xlsx'],
-            help="Your Maintenance PO's Excel file"
-        )
+# ---------------------------------------------------------------------------
+# Main content
+# ---------------------------------------------------------------------------
+st.markdown("## Menkind Maintenance PO Processing")
 
-        cost_centre = st.file_uploader(
-            "Cost Centre Summary",
-            type=['xlsx'],
-            help="Cost Centre Summary (Addresses & Nominal Codes)"
-        )
+# Empty state -- no files uploaded
+if not all_files_uploaded and not st.session_state.get('processed'):
+    st.markdown("Upload files in the sidebar to get started.")
 
-        if maintenance_po:
-            st.success(f"✓ {maintenance_po.name}")
-        if cost_centre:
-            st.success(f"✓ {cost_centre.name}")
+# Files uploaded but not yet processed
+elif all_files_uploaded and not st.session_state.get('processed') and not process_button:
+    st.markdown("Files uploaded. Click **Process Invoices** in the sidebar.")
 
-    # Process button
-    st.header("Step 2: Process")
+# ---------------------------------------------------------------------------
+# Processing pipeline (preserved exactly from original)
+# ---------------------------------------------------------------------------
+if process_button and all_files_uploaded:
+    with st.spinner("Processing invoices..."):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
 
-    col1, col2, col3 = st.columns([1, 1, 1])
+            # Save uploaded files
+            pdf_dir = temp_path / "invoices"
+            pdf_dir.mkdir()
 
-    with col2:
-        process_button = st.button(
-            "🚀 Process Invoices",
-            type="primary",
-            disabled=not (invoice_pdfs and maintenance_po and cost_centre)
-        )
+            for pdf in invoice_pdfs:
+                pdf_path = pdf_dir / pdf.name
+                pdf_path.write_bytes(pdf.read())
 
-    if not (invoice_pdfs and maintenance_po and cost_centre):
-        st.warning("⚠️ Please upload all required files before processing")
+            # Save Excel files
+            maintenance_path = temp_path / "maintenance.xlsx"
+            maintenance_path.write_bytes(maintenance_po.read())
 
-    # Processing
-    if process_button and invoice_pdfs and maintenance_po and cost_centre:
-        with st.spinner("Processing invoices..."):
-            # Create temporary directory
-            with tempfile.TemporaryDirectory() as temp_dir:
-                temp_path = Path(temp_dir)
+            cost_centre_path = temp_path / "cost_centre.xlsx"
+            cost_centre_path.write_bytes(cost_centre.read())
 
-                # Save uploaded files
-                pdf_dir = temp_path / "invoices"
-                pdf_dir.mkdir()
+            # Initialize components
+            excel_reader = ExcelReader(maintenance_path, cost_centre_path)
+            validator = InvoiceValidator(excel_reader)
 
-                for pdf in invoice_pdfs:
-                    pdf_path = pdf_dir / pdf.name
-                    pdf_path.write_bytes(pdf.read())
+            # Process each invoice
+            results = []
+            progress_bar = st.progress(0)
+            status_text = st.empty()
 
-                # Save Excel files
-                maintenance_path = temp_path / "maintenance.xlsx"
-                maintenance_path.write_bytes(maintenance_po.read())
+            pdf_files = list(pdf_dir.glob("*.pdf"))
+            total_pdfs = len(pdf_files)
 
-                cost_centre_path = temp_path / "cost_centre.xlsx"
-                cost_centre_path.write_bytes(cost_centre.read())
+            for i, pdf_file in enumerate(pdf_files):
+                status_text.text(f"Processing {pdf_file.name}...")
+                progress_bar.progress((i + 1) / total_pdfs)
 
-                # Initialize components
-                excel_reader = ExcelReader(maintenance_path, cost_centre_path)
-                validator = InvoiceValidator(excel_reader)
+                try:
+                    invoice = extract_invoice(pdf_file)
+                    result = validator.validate(invoice)
+                    results.append(result)
+                except Exception as e:
+                    error_msg = f"Could not read '{pdf_file.name}': {e}"
+                    result = ValidationResult.create_error(str(pdf_file), error_msg)
+                    results.append(result)
 
-                # Process each invoice
-                results = []
-                progress_bar = st.progress(0)
-                status_text = st.empty()
+            progress_bar.empty()
+            status_text.empty()
 
-                pdf_files = list(pdf_dir.glob("*.pdf"))
-                total_pdfs = len(pdf_files)
-
-                for i, pdf_file in enumerate(pdf_files):
-                    status_text.text(f"Processing {pdf_file.name}...")
-                    progress_bar.progress((i + 1) / total_pdfs)
-
-                    try:
-                        invoice = extract_invoice(pdf_file)
-                        result = validator.validate(invoice)
-                        results.append(result)
-                    except Exception as e:
-                        error_msg = f"Could not read '{pdf_file.name}': {e}"
-                        result = ValidationResult.create_error(str(pdf_file), error_msg)
-                        results.append(result)
-
-                progress_bar.empty()
-                status_text.empty()
-
-                # Write auto-updated results to Excel
-                with ExcelWriter(maintenance_path, create_backup=False) as writer:
-                    for result in results:
-                        if result.can_auto_update:
-                            writer.update_po_record(
-                                result.po_record.sheet_name,
-                                result.po_record.row_index,
-                                result.invoice.invoice_number,
-                                result.invoice.net_amount,
-                                datetime.now()
-                            )
-
-                # Read updated Excel into memory (auto-updates applied)
-                with open(maintenance_path, 'rb') as f:
-                    updated_excel_bytes = f.read()
-
-                # Generate reports
-                report_gen = ReportGenerator(results)
-                summary = report_gen.generate_summary()
-
-                temp_csv = temp_path / "summary.csv"
-                report_gen.save_summary_csv(temp_csv)
-                csv_content = temp_csv.read_text()
-
-                temp_report = temp_path / "report.txt"
-                report_gen.save_detailed_report(temp_report)
-                report_content = temp_report.read_text()
-
-                # Store in session state
-                st.session_state['results'] = results
-                st.session_state['updated_excel_bytes'] = updated_excel_bytes
-                st.session_state['csv_content'] = csv_content
-                st.session_state['report_content'] = report_content
-                st.session_state['processed'] = True
-                # Track review decisions: {index: "confirmed" | "skipped" | None}
-                review_results = [r for r in results if r.needs_review]
-                st.session_state['review_decisions'] = {i: None for i in range(len(review_results))}
-
-    # Results
-    if st.session_state.get('processed'):
-        st.success("Processing Complete!")
-
-        results = st.session_state['results']
-
-        # Split into 3 buckets
-        auto_results = [r for r in results if r.can_auto_update]
-        review_results = [r for r in results if r.needs_review]
-        failed_results = [r for r in results if not r.can_auto_update and not r.needs_review]
-
-        # Summary metrics
-        st.header("Step 3: Results")
-
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Total Invoices", len(results))
-        col2.metric("Auto-Updated", len(auto_results), delta=None, delta_color="normal")
-        col3.metric("Needs Review", len(review_results), delta=None, delta_color="inverse")
-        col4.metric("Failed", len(failed_results), delta=None, delta_color="inverse")
-
-        # Detailed results table
-        st.subheader("Invoice Details")
-
-        table_data = []
-        for result in results:
-            if result.invoice:
-                if result.can_auto_update:
-                    status_icon = "✅"
-                elif result.needs_review:
-                    status_icon = "🔍"
-                else:
-                    status_icon = "❌"
-                issues = result.errors + result.warnings
-                table_data.append({
-                    "Status": status_icon,
-                    "Invoice #": result.invoice.invoice_number,
-                    "Supplier": result.invoice.supplier_name,
-                    "PO #": result.invoice.po_number or "No PO",
-                    "Store": result.invoice.store_location,
-                    "Amount": f"£{result.invoice.net_amount:.2f}",
-                    "Issues": issues[0] if issues else "None"
-                })
-            else:
-                table_data.append({
-                    "Status": "❌",
-                    "Invoice #": "N/A",
-                    "Supplier": "N/A",
-                    "PO #": "N/A",
-                    "Store": "N/A",
-                    "Amount": "N/A",
-                    "Issues": result.errors[0] if result.errors else "Extraction failed"
-                })
-
-        st.dataframe(table_data, use_container_width=True)
-
-        # --- Review section for near-miss invoices ---
-        review_decisions = st.session_state.get('review_decisions', {})
-
-        if review_results:
-            st.header(f"Invoices Needing Review ({len(review_results)})")
-            st.markdown("These invoices matched a PO but need your confirmation due to uncertain matching. "
-                        "Review each one and confirm or skip.")
-
-            for idx, result in enumerate(review_results):
-                inv = result.invoice
-                po = result.po_record
-                decision = review_decisions.get(idx)
-
-                if decision == "confirmed":
-                    st.success(f"**{inv.invoice_number}** — Confirmed")
-                    continue
-                elif decision == "skipped":
-                    st.info(f"**{inv.invoice_number}** — Skipped")
-                    continue
-
-                with st.container(border=True):
-                    st.markdown(f"### {inv.invoice_number} — {inv.supplier_name}")
-
-                    detail_col1, detail_col2 = st.columns(2)
-                    with detail_col1:
-                        st.markdown("**Invoice Details**")
-                        st.text(f"Amount:  £{inv.net_amount:.2f}")
-                        st.text(f"PO #:    {inv.po_number or 'Not on invoice'}")
-                        st.text(f"Store:   {inv.store_location or 'Unknown'}")
-
-                    with detail_col2:
-                        st.markdown("**Matched PO Record**")
-                        st.text(f"PO #:    {po.po_number}")
-                        st.text(f"Store:   {po.store}")
-                        st.text(f"Sheet:   {po.sheet_name}, row {po.row_index + 1}")
-
-                    # Show the warnings/errors that caused the review flag
-                    for error in result.errors:
-                        st.error(f"❌ {error}")
-                    for warning in result.warnings:
-                        st.warning(f"⚠️ {warning}")
-
-                    btn_col1, btn_col2, _ = st.columns([1, 1, 3])
-                    with btn_col1:
-                        if st.button("Confirm Update", key=f"confirm_{idx}", type="primary"):
-                            st.session_state['review_decisions'][idx] = "confirmed"
-                            st.rerun()
-                    with btn_col2:
-                        if st.button("Skip", key=f"skip_{idx}"):
-                            st.session_state['review_decisions'][idx] = "skipped"
-                            st.rerun()
-
-        # --- Check if all reviews are resolved ---
-        all_reviewed = all(d is not None for d in review_decisions.values()) if review_decisions else True
-        confirmed_indices = [i for i, d in review_decisions.items() if d == "confirmed"]
-
-        # If there are confirmed items that need writing, rebuild the Excel
-        if confirmed_indices and all_reviewed and not st.session_state.get('reviews_written'):
-            with tempfile.TemporaryDirectory() as temp_dir:
-                temp_path = Path(temp_dir)
-                maintenance_path = temp_path / "maintenance.xlsx"
-                maintenance_path.write_bytes(st.session_state['updated_excel_bytes'])
-
-                with ExcelWriter(maintenance_path, create_backup=False) as writer:
-                    for idx in confirmed_indices:
-                        result = review_results[idx]
+            # Write auto-updated results to Excel
+            with ExcelWriter(maintenance_path, create_backup=False) as writer:
+                for result in results:
+                    if result.can_auto_update:
                         writer.update_po_record(
                             result.po_record.sheet_name,
                             result.po_record.row_index,
@@ -403,186 +464,179 @@ with tab1:
                             datetime.now()
                         )
 
-                with open(maintenance_path, 'rb') as f:
-                    st.session_state['updated_excel_bytes'] = f.read()
-                st.session_state['reviews_written'] = True
+            # Read updated Excel into memory (auto-updates applied)
+            with open(maintenance_path, 'rb') as f:
+                updated_excel_bytes = f.read()
 
-        # --- Failed section ---
-        if failed_results:
-            st.header(f"Failed Invoices ({len(failed_results)})")
-            with st.expander("View Issues", expanded=True):
-                for result in failed_results:
-                    if result.invoice:
-                        po_info = ""
-                        if result.po_record:
-                            po_info = f" | PO '{result.po_record.po_number}' (sheet '{result.po_record.sheet_name}', row {result.po_record.row_index + 1})"
-                        st.markdown(f"**{result.invoice.invoice_number}** — {result.invoice.supplier_name}{po_info}")
-                    else:
-                        st.markdown(f"**Extraction Error**")
-                    for error in result.errors:
-                        st.error(f"❌ {error}")
-                    for warning in result.warnings:
-                        st.warning(f"⚠️ {warning}")
-                    st.divider()
+            # Generate reports
+            report_gen = ReportGenerator(results)
+            summary = report_gen.generate_summary()
 
-        # --- Download section ---
-        st.header("Step 4: Download Results")
+            temp_csv = temp_path / "summary.csv"
+            report_gen.save_summary_csv(temp_csv)
+            csv_content = temp_csv.read_text()
 
-        if not all_reviewed:
-            st.info("Review all near-miss invoices above before downloading.")
-        else:
-            confirmed_count = len(confirmed_indices)
-            if confirmed_count > 0:
-                st.info(f"Excel includes {len(auto_results)} auto-updated + {confirmed_count} confirmed invoices.")
+            temp_report = temp_path / "report.txt"
+            report_gen.save_detailed_report(temp_report)
+            report_content = temp_report.read_text()
 
-            col1, col2, col3 = st.columns(3)
+            # Store in session state
+            st.session_state['results'] = results
+            st.session_state['updated_excel_bytes'] = updated_excel_bytes
+            st.session_state['csv_content'] = csv_content
+            st.session_state['report_content'] = report_content
+            st.session_state['processed'] = True
+            # Track review decisions: {index: "confirmed" | "skipped" | None}
+            review_results = [r for r in results if r.needs_review]
+            st.session_state['review_decisions'] = {i: None for i in range(len(review_results))}
 
-            with col1:
-                st.download_button(
-                    label="📊 Download Updated Excel",
-                    data=st.session_state['updated_excel_bytes'],
-                    file_name=f"Maintenance_POs_Updated_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    type="primary"
-                )
 
-            with col2:
-                st.download_button(
-                    label="📄 Download CSV Summary",
-                    data=st.session_state['csv_content'],
-                    file_name=f"invoice_summary_{datetime.now().strftime('%Y%m%d')}.csv",
-                    mime="text/csv"
-                )
+# ---------------------------------------------------------------------------
+# Results -- three-column board layout
+# ---------------------------------------------------------------------------
+if st.session_state.get('processed'):
+    results = st.session_state['results']
 
-            with col3:
-                st.download_button(
-                    label="📝 Download Detailed Report",
-                    data=st.session_state['report_content'],
-                    file_name=f"invoice_report_{datetime.now().strftime('%Y%m%d')}.txt",
-                    mime="text/plain"
-                )
+    # Split into 3 buckets
+    auto_results = [r for r in results if r.can_auto_update]
+    review_results = [r for r in results if r.needs_review]
+    failed_results = [r for r in results if not r.can_auto_update and not r.needs_review]
 
-with tab2:
-    st.header("About This Automation")
+    # Inline metrics
+    metrics_html = f'''<div class="inline-metrics">
+        <div class="inline-metric"><strong>{len(results)}</strong> total</div>
+        <div class="inline-metric"><strong>{len(auto_results)}</strong> matched</div>
+        <div class="inline-metric"><strong>{len(review_results)}</strong> review</div>
+        <div class="inline-metric"><strong>{len(failed_results)}</strong> failed</div>
+    </div>'''
+    st.markdown(metrics_html, unsafe_allow_html=True)
 
-    st.markdown("""
-    ### What It Does
+    # Three-column board
+    col_match, col_review, col_fail = st.columns(3)
 
-    This automation processes maintenance invoices by:
+    # --- Matched column ---
+    with col_match:
+        st.markdown(f'<div class="col-header col-header-green">Matched ({len(auto_results)})</div>', unsafe_allow_html=True)
+        for r in auto_results:
+            st.markdown(inv_card_html(r.invoice, r.po_record), unsafe_allow_html=True)
 
-    1. **Extracting** data from invoice PDFs (invoice #, PO #, amounts, store, supplier)
-    2. **Finding** matching Purchase Order records in your spreadsheet
-    3. **Validating** against company policies:
-       - PO exists and not already invoiced
-       - Store name matches
-       - Nominal code is correct
-       - **£200+ quotes are authorized** (critical check)
-       - Amounts are valid
-    4. **Updating** your Excel spreadsheet with:
-       - Invoice number
-       - Invoice amount (ex-VAT)
-       - Invoice signed date
-    5. **Generating** detailed reports
+    # --- Review column ---
+    with col_review:
+        st.markdown(f'<div class="col-header col-header-amber">Needs Review ({len(review_results)})</div>', unsafe_allow_html=True)
+        review_decisions = st.session_state.get('review_decisions', {})
 
-    ### Supported Suppliers
+        for idx, result in enumerate(review_results):
+            inv = result.invoice
+            po = result.po_record
+            decision = review_decisions.get(idx)
 
-    - AAW National Shutters
-    - CJL Group
-    - APS Fire Systems
-    - Amazon Business
-    - Compco Fire Systems
-    - Other suppliers (generic extraction)
+            if decision == "confirmed":
+                st.success(f"**{inv.invoice_number}** -- Confirmed")
+                continue
+            elif decision == "skipped":
+                st.info(f"**{inv.invoice_number}** -- Skipped")
+                continue
 
-    ### Security & Privacy
+            with st.container(border=True):
+                st.markdown(f"**{inv.invoice_number}**")
+                st.caption(f"{inv.supplier_name}")
+                st.markdown(f"**\u00a3{inv.net_amount:.2f}**")
+                st.caption(f"Store: {inv.store_location}")
+                if po:
+                    st.caption(f"PO: {po.po_number}  |  {po.store}")
 
-    - ✅ All processing happens in your browser session
-    - ✅ No data is stored on servers
-    - ✅ Files are deleted immediately after processing
-    - ✅ HTTPS encrypted connection
-    - ✅ No user accounts or login required
+                for error in result.errors:
+                    st.markdown(f"<span style='color:var(--amber);font-size:0.8rem'>{error}</span>", unsafe_allow_html=True)
+                for warning in result.warnings:
+                    st.markdown(f"<span style='color:var(--amber);font-size:0.8rem'>{warning}</span>", unsafe_allow_html=True)
 
-    ### Critical £200+ Check
+                bc1, bc2 = st.columns(2)
+                with bc1:
+                    if st.button("Confirm Update", key=f"confirm_{idx}", type="primary",
+                                 use_container_width=True):
+                        st.session_state['review_decisions'][idx] = "confirmed"
+                        st.rerun()
+                with bc2:
+                    if st.button("Skip", key=f"skip_{idx}", use_container_width=True):
+                        st.session_state['review_decisions'][idx] = "skipped"
+                        st.rerun()
 
-    For invoices over £200 (ex-VAT):
-    - Must have "QUOTE OVER £200" filled in
-    - Must have "AUTHORISED" filled in
-    - Auto-update is **BLOCKED** if authorization missing
+    # --- Failed column ---
+    with col_fail:
+        st.markdown(f'<div class="col-header col-header-red">Failed ({len(failed_results)})</div>', unsafe_allow_html=True)
+        for result in failed_results:
+            err_html = "".join(f'<div class="inv-error">{e}</div>' for e in result.errors)
+            if result.invoice:
+                st.markdown(inv_card_html(result.invoice, result.po_record, err_html), unsafe_allow_html=True)
+            else:
+                st.markdown(f'''<div class="inv-card">
+                    <div class="inv-num">Extraction Error</div>
+                    {err_html}
+                </div>''', unsafe_allow_html=True)
 
-    This ensures company policy compliance before payment.
-    """)
+    # --- Check if all reviews are resolved ---
+    review_decisions = st.session_state.get('review_decisions', {})
+    all_reviewed = all(d is not None for d in review_decisions.values()) if review_decisions else True
+    confirmed_indices = [i for i, d in review_decisions.items() if d == "confirmed"]
 
-with tab3:
-    st.header("Help & Troubleshooting")
+    # If there are confirmed items that need writing, rebuild the Excel
+    if confirmed_indices and all_reviewed and not st.session_state.get('reviews_written'):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            maintenance_path = temp_path / "maintenance.xlsx"
+            maintenance_path.write_bytes(st.session_state['updated_excel_bytes'])
 
-    st.markdown("""
-    ### Common Issues
+            with ExcelWriter(maintenance_path, create_backup=False) as writer:
+                for idx in confirmed_indices:
+                    result = review_results[idx]
+                    writer.update_po_record(
+                        result.po_record.sheet_name,
+                        result.po_record.row_index,
+                        result.invoice.invoice_number,
+                        result.invoice.net_amount,
+                        datetime.now()
+                    )
 
-    **Q: All invoices failed with "PO not found"**
+            with open(maintenance_path, 'rb') as f:
+                st.session_state['updated_excel_bytes'] = f.read()
+            st.session_state['reviews_written'] = True
 
-    A: This usually means:
-    - The PO numbers in invoices don't match your spreadsheet
-    - You uploaded the wrong Maintenance PO file
-    - The POs haven't been created yet
+    # --- Download section ---
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
-    **Q: Amounts look wrong**
+    if not all_reviewed:
+        st.info("Review all near-miss invoices above before downloading.")
+    else:
+        confirmed_count = len(confirmed_indices)
+        if confirmed_count > 0:
+            st.info(f"Excel includes {len(auto_results)} auto-updated + {confirmed_count} confirmed invoices.")
 
-    A: The automation extracts NET amounts (excluding VAT). This is correct for the "INVOICE AMOUNT (EX VAT)" column.
+        dc1, dc2, dc3 = st.columns(3)
 
-    **Q: Invoice over £200 blocked**
+        with dc1:
+            st.download_button(
+                label="Download Updated Excel",
+                data=st.session_state['updated_excel_bytes'],
+                file_name=f"Maintenance_POs_Updated_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                type="primary",
+                use_container_width=True
+            )
 
-    A: Check the "QUOTE OVER £200" and "AUTHORISED" columns in your spreadsheet. Both must have values for invoices over £200.
+        with dc2:
+            st.download_button(
+                label="Download CSV Summary",
+                data=st.session_state['csv_content'],
+                file_name=f"invoice_summary_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
 
-    **Q: Store name mismatch**
-
-    A: The automation uses fuzzy matching. If the invoice shows "Leicester City" but PO shows "Leicester", it should still match. If confidence is low, it flags for review.
-
-    **Q: Can I process the same invoices again?**
-
-    A: Yes, but invoices already processed (PO already has invoice number) will be flagged as duplicates.
-
-    ### Weekly Workflow
-
-    1. Export invoices from iCompleat as PDFs
-    2. Visit this website
-    3. Upload PDFs and Excel files
-    4. Click "Process Invoices"
-    5. Download updated Excel file
-    6. Review any flagged invoices
-    7. Approve invoices in iCompleat
-
-    ### Excel Files Needed
-
-    You need to upload 2 Excel files every time:
-
-    1. **Maintenance PO Spreadsheet** - Contains sheets like:
-       - AAW NATIONAL (PANDA)
-       - CJL
-       - APS
-       - ORDERS
-       - OTHER
-       - etc.
-
-    2. **Cost Centre Summary** - Contains:
-       - Store addresses
-       - Nominal code mappings
-
-    ### What Gets Updated
-
-    Only 3 columns are updated in matching PO rows:
-    - INVOICE NO.
-    - INVOICE AMOUNT (EX VAT)
-    - INVOICE SIGNED
-
-    Everything else is preserved unchanged.
-
-    ### Need More Help?
-
-    Check the detailed report (download after processing) for:
-    - Exactly which validations passed/failed
-    - Error messages with explanations
-    - Suggestions for fixing issues
-    """)
-
-# Footer
-st.divider()
-st.caption("Invoice Processing Automation v1.0 | No data stored | Session expires after download")
+        with dc3:
+            st.download_button(
+                label="Download Detailed Report",
+                data=st.session_state['report_content'],
+                file_name=f"invoice_report_{datetime.now().strftime('%Y%m%d')}.txt",
+                mime="text/plain",
+                use_container_width=True
+            )
