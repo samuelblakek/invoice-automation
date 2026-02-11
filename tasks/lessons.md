@@ -27,3 +27,21 @@
 ## 6. PO cells can contain embedded whitespace/newlines
 
 **Pattern:** CJL sheet has PO values like `\nCJL408\n`. Use substring/contains matching, not exact comparison. Strip and normalize before matching.
+
+## 7. Centralise supplier identification in a single registry
+
+**Trigger:** Tech debt scan found supplier identification logic triplicated across GenericExtractor, web_app.py, and extractors.
+
+**Rule:** `utils/supplier_registry.py` is the single source of truth for mapping text/filename markers to supplier names and type codes. Both extractors and the web app delegate to `identify_supplier()` from the registry. To add a new supplier, add one entry there.
+
+## 8. Never monkey-patch dataclass fields — add them properly
+
+**Trigger:** `result._nominal_code = nom_code` was used to attach nominal codes to ValidationResult at runtime, then retrieved with `getattr(result, "_nominal_code", "")`.
+
+**Rule:** If a dataclass needs a new field, add it with a default value. Monkey-patching bypasses type checking, breaks IDE support, and makes the code fragile.
+
+## 9. Verify dead code is truly dead before deleting
+
+**Trigger:** Deleted 370+ lines of unused methods from utility classes.
+
+**Rule:** Before deleting any method, grep the entire codebase for references (not just the definition). A method is safe to remove only if zero call sites exist outside its own definition. After deletion, verify all imports still work.

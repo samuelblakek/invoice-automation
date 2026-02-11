@@ -20,15 +20,23 @@ The invoice processing pipeline is operational. PDFs are extracted, matched agai
 
 ## Recent Session (2026-02-11)
 
-Focused on nominal code persistence and matching:
+Ran full code quality analysis (lint, tech debt, best practices, performance) and fixed all issues:
+- Created `utils/supplier_registry.py` — single source of truth for supplier identification (eliminates triplicated logic)
+- Added sheet caching to ExcelReader for performance
+- Removed 370+ lines of dead code across 6 utility/extractor files
+- Fixed type annotations throughout (any/object -> Optional[datetime], bare tuples -> parameterized, etc.)
+- Replaced print() with logging, added error handling to nominal code I/O
+- Removed unused dependencies (click, pyyaml)
+- All imports verified, ruff passes clean
+
+Previous session focused on nominal code persistence and matching:
 - Moved nominal codes from session-state-only to JSON-file-backed storage
 - Removed cost centre file dependency
 - Fixed sidebar UI (replaced broken data_editor with compact list + controls)
 - Built smart matching: space-stripped comparison, first-word fallback, work-type scoring for multi-code suppliers
-- All 21 suppliers mapped and tested
 
 ## Known Limitations
 
-- Supplier name matching depends on the generic extractor's `_identify_supplier()` output — new suppliers may need entries added to both the extractor and the nominal code mapping
+- New suppliers need entries in `utils/supplier_registry.py`, `SheetSelector.SUPPLIER_SHEET_MAP`, and the nominal code mapping in the sidebar
 - Work-type disambiguation relies on word overlap between mapping descriptions and invoice PDF text — very short descriptions may not differentiate well
 - No automated tests — verification is manual via the web app with example PDFs

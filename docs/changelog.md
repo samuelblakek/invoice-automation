@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-02-11 — Code Cleanup & Tech Debt Removal
+
+- Ran lint (ruff), tech debt, best practices, and performance scans across the codebase
+- **High-severity fixes:**
+  - Created `utils/supplier_registry.py` as single source of truth for supplier identification (was triplicated across GenericExtractor, web_app.py, and extractors)
+  - Added `_sheet_cache` to ExcelReader to avoid redundant disk I/O during matching
+  - Fixed `ValidationResult.nominal_code` — added as proper dataclass field (was monkey-patched at runtime)
+  - Fixed unscoped `store_text` variable in APS extractor
+- **Dead code removal (370+ lines):**
+  - Removed 5 unused methods + PO_PATTERNS from StringMatcher
+  - Removed 4 unused methods from BaseExtractor
+  - Removed 4 unused methods + AMOUNT_PATTERN from AmountParser
+  - Removed 3 unused methods from DateParser
+  - Removed 4 dead methods from ExcelReader (load_codes_sheet, load_cost_centre_summary, load_nominal_code_mapping, get_store_list)
+- **Type annotation fixes:**
+  - Replaced `-> any` / `-> object` with `-> Optional[datetime]` in all extractors
+  - Replaced bare `-> tuple` with parameterized tuples throughout
+  - Fixed `-> int` to `-> Optional[int]` in ExcelWriter header/column finders
+  - Replaced `Any` with `Optional[str]` in Validation model
+  - Added return type to `ValidationResult.create_error`
+- **Other improvements:**
+  - Replaced all `print()` calls with `logging` module in ExcelReader and ExcelWriter
+  - Added error handling to nominal code JSON load/save
+  - Removed unused dependencies (click, pyyaml) from requirements.txt
+  - Fixed unused exception variables flagged by ruff
+
 ## 2026-02-11 — Nominal Code Persistence & Matching
 
 - Nominal code mapping now persisted in `data/nominal_codes.json` — survives resets, page refreshes, and doesn't require re-uploading the cost centre file

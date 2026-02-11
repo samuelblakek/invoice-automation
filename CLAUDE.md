@@ -11,8 +11,8 @@
   - `base_extractor.py` — Abstract base class for all extractors
 - `processors/` — Excel reading (`excel_reader.py`), writing, sheet selection (`sheet_selector.py`)
 - `validators/` — PO matching (`po_matcher.py`), amount validation, authorization checks
-- `models/` — Data classes: `InvoiceData`, `PORecord`, `ValidationResult`
-- `utils/` — Helpers (amount parsing, text normalization)
+- `models/` — Data classes: `Invoice`, `PORecord`, `ValidationResult`
+- `utils/` — Helpers (amount parsing, date parsing, string matching, supplier registry)
 - `reports/` — Report generation (CSV summary, text report)
 
 **Data files:**
@@ -47,8 +47,10 @@ Process example PDFs in `example-files/` against the test Excel file (`Maintenan
 - **Excel headers at row 5-6, not row 0** — The Maintenance PO workbook has 4-5 rows of title/color-legend before the actual header row.
 - **PO is optional** — Not all invoices have PO numbers. The pipeline handles PO-less invoices via fuzzy matching fallback.
 - **No AI/LLM tokens used** — The app is entirely rule-based (regex, fuzzy string matching, pandas). Claude Code wrote the code but the running app uses zero AI.
-- **Supplier name mismatch** — The generic extractor's `_identify_supplier()` returns names like `"LampShopOnline"` or `"MetSafe"`, which may not match the mapping table's `"Lamp Shop Online"` or `"Metro Security (UK) Limited (MetSafe)"`. The lookup handles this via space-stripped comparison, but new suppliers may need entries in both the extractor and the mapping.
+- **Supplier registry is the single source of truth** — `utils/supplier_registry.py` holds all supplier text/filename markers, names, and type codes. Both `GenericExtractor._identify_supplier()` and `web_app.identify_supplier()` delegate to it. To add a new supplier, add one entry there (plus a sheet mapping in `SheetSelector` and a nominal code row in the sidebar).
+- **Supplier name mismatch** — The registry returns names like `"LampShopOnline"` or `"MetSafe"`, which may not match the mapping table's `"Lamp Shop Online"` or `"Metro Security (UK) Limited (MetSafe)"`. The lookup handles this via space-stripped comparison, but new suppliers may need entries in both the registry and the nominal code mapping.
 - **Cost centre file removed** — The Cost Centre Summary uploader was removed. Nominal codes come from JSON, and `ExcelReader.cost_centre_path` is now optional (defaults to `None`).
+- **ExcelReader caches sheet reads** — `_sheet_cache` prevents redundant disk I/O when the same sheet is accessed multiple times during matching. The cache lives for the lifetime of the `ExcelReader` instance.
 
 ## UI / Styling
 
