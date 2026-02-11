@@ -79,10 +79,7 @@ class APSExtractor(BaseExtractor):
             self._find_pattern(text, r'Total\s*:?\s*£?\s*([\d,]+\.?\d*)', re.IGNORECASE) or "0"
         )
 
-        # Determine nominal code based on service type
-        nominal_code = "7800"  # Default: Maintenance Contracts
-        if re.search(r'installation|install', text, re.IGNORECASE):
-            nominal_code = "7830"
+        nominal_code = ""
 
         description = self._find_pattern(text, r'Description\s*:?\s*(.*?)(?:\n\n|Total)', re.IGNORECASE | re.DOTALL) or ""
         description = ' '.join(description.split())[:500]

@@ -63,8 +63,7 @@ class GenericExtractor(BaseExtractor):
         # Extract store/site info
         store_location = self._extract_store_location(text) or ""
 
-        # Try to extract nominal code
-        nominal_code = self.string_matcher.extract_nominal_code(text) or "7820"
+        nominal_code = ""
 
         # Extract description
         description = self._extract_description(text)

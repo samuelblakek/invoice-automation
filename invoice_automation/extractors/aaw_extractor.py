@@ -61,8 +61,7 @@ class AAWExtractor(BaseExtractor):
         # Extract description
         description = self._extract_description(text)
 
-        # AAW invoices are typically for store repairs (nominal code 7820)
-        nominal_code = "7820"
+        nominal_code = ""
 
         # Create invoice object
         invoice = Invoice(

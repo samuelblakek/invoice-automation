@@ -71,11 +71,7 @@ class InvoiceValidator:
             result.finalize()
             return result
 
-        # Step 2: Validate nominal code
-        nominal_validation = self._validate_nominal_code(invoice, po_record)
-        result.add_validation(nominal_validation)
-
-        # Step 3: Validate quote authorization (£200+ check)
+        # Step 2: Validate quote authorization (£200+ check)
         quote_validation = self.quote_validator.validate(invoice, po_record)
         result.add_validation(quote_validation)
 

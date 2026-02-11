@@ -40,8 +40,9 @@ class AmazonExtractor(BaseExtractor):
         if not invoice_number:
             raise PDFExtractionError("Could not extract invoice number from Amazon invoice")
 
-        # Extract PO number and nominal code
-        po_number, nominal_code, store_from_po = self._extract_po_and_code(text)
+        # Extract PO number
+        po_number, _nominal_code, store_from_po = self._extract_po_and_code(text)
+        nominal_code = ""
         if not po_number:
             raise PDFExtractionError("Could not extract PO number from Amazon invoice")
 
