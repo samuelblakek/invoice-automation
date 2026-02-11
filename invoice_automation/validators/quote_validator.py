@@ -22,12 +22,12 @@ class QuoteValidator:
         """
         Validate quote authorization for invoices over the threshold.
 
-        Logic (as specified by user):
+        Logic:
         - If invoice amount (ex-VAT) > £200:
-          - Check "QUOTE OVER £200" column - must have a value
-          - Check "AUTHORISED" column - must have a value
-          - BLOCK if quote reference exists but authorization is empty
-          - BLOCK if no quote reference at all
+          - Check "QUOTE OVER £200" column
+          - Check "AUTHORISED" column
+          - PASS with no warnings if both present
+          - WARN (but still match) if either is missing
 
         Args:
             invoice: Invoice to validate
@@ -66,34 +66,34 @@ class QuoteValidator:
         sheet = po_record.sheet_name
         row = po_record.row_index + 1
 
-        # Case 2: Has quote reference but NO authorization → BLOCK
+        # Case 2: Has quote reference but NO authorization → WARN
         if has_quote_ref and not has_authorization:
             return Validation(
                 check_name="Quote Authorization (£200+ Check)",
                 passed=False,
                 expected="Quote reference AND authorization",
                 actual=f"Quote: {po_record.quote_over_200}, Auth: MISSING",
-                severity=ValidationSeverity.ERROR,
-                message=f"Invoice £{invoice.net_amount:.2f} exceeds £200 — quote '{po_record.quote_over_200}' exists but 'AUTHORISED' is empty (sheet '{sheet}', row {row}). Get authorization, fill in the column, then reprocess."
+                severity=ValidationSeverity.WARNING,
+                message=f"Over £200 — quote '{po_record.quote_over_200}' present but 'AUTHORISED' is empty (sheet '{sheet}', row {row})"
             )
 
-        # Case 3: No quote reference at all → BLOCK
-        if not has_quote_ref:
+        # Case 3: No quote reference at all → WARN
+        if not has_quote_ref and not has_authorization:
             return Validation(
                 check_name="Quote Authorization (£200+ Check)",
                 passed=False,
                 expected="Quote reference and authorization",
                 actual="No quote reference found",
-                severity=ValidationSeverity.ERROR,
-                message=f"Invoice £{invoice.net_amount:.2f} exceeds £200 but 'QUOTE OVER £200' is empty (sheet '{sheet}', row {row}). Fill in the quote reference and 'AUTHORISED' columns, then reprocess."
+                severity=ValidationSeverity.WARNING,
+                message=f"Over £200 — 'QUOTE OVER £200' and 'AUTHORISED' are both empty (sheet '{sheet}', row {row})"
             )
 
-        # Case 4: Has authorization but no quote reference → BLOCK (shouldn't happen, but handle it)
+        # Case 4: Has authorization but no quote reference → WARN
         return Validation(
             check_name="Quote Authorization (£200+ Check)",
             passed=False,
             expected="Quote reference and authorization",
             actual=f"No quote ref, Auth: {po_record.authorized}",
-            severity=ValidationSeverity.ERROR,
-            message=f"Authorization present but no quote reference (sheet '{sheet}', row {row}). Fix the 'QUOTE OVER £200' column, then reprocess."
+            severity=ValidationSeverity.WARNING,
+            message=f"Over £200 — authorized by '{po_record.authorized}' but 'QUOTE OVER £200' is empty (sheet '{sheet}', row {row})"
         )

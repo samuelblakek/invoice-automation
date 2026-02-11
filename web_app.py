@@ -156,6 +156,11 @@ section[data-testid="stSidebar"] {
     font-size: 0.8rem;
     margin-top: 0.3rem;
 }
+.inv-card .inv-warning {
+    color: var(--amber);
+    font-size: 0.8rem;
+    margin-top: 0.3rem;
+}
 
 /* ---------- Column header pills ---------- */
 .col-header {
@@ -570,7 +575,8 @@ if st.session_state.get('processed'):
     with col_match:
         st.markdown(f'<div class="col-header col-header-green">Matched ({len(auto_results)})</div>', unsafe_allow_html=True)
         for r in auto_results:
-            st.markdown(inv_card_html(r.invoice, r.po_record, accent="var(--green)"), unsafe_allow_html=True)
+            warn_html = "".join(f'<div class="inv-warning">{w}</div>' for w in r.warnings)
+            st.markdown(inv_card_html(r.invoice, r.po_record, warn_html, accent="var(--green)"), unsafe_allow_html=True)
 
     # --- Review column ---
     with col_review:
