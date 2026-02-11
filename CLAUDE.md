@@ -15,6 +15,9 @@
 - `utils/` — Helpers (amount parsing, text normalization)
 - `reports/` — Report generation (CSV summary, text report)
 
+**Data files:**
+- `data/nominal_codes.json` — Supplier→nominal code mapping (persisted, editable via sidebar)
+
 ## How to Run
 
 ```bash
@@ -33,6 +36,8 @@ Process example PDFs in `example-files/` against the test Excel file (`Maintenan
 - **Excel header detection** — Headers are at row 5-6, not row 0. The reader scans for the header row dynamically by looking for known column names (PO, STORE, etc.).
 - **Billing city exclusion** — When extracting store/delivery address, known billing HQ cities (e.g. "Dorking" for Menkind) and duplicate cities are excluded to find the actual delivery location.
 - **Sheet selection** — Supplier name maps to the correct Excel sheet (e.g. CJL -> "CJL", Amazon -> "ORDERS", generic -> "OTHER").
+- **Nominal code mapping** — Persisted in `data/nominal_codes.json`, loaded into session state on startup. The sidebar expander shows all mappings and supports add/remove with save-to-disk. Codes are 4-digit numbers only (e.g. `7820`, not `7820 Stores Repairs`).
+- **Nominal code lookup** — `lookup_nominal_code()` in `web_app.py` handles: (1) substring matching with space-stripping (so `LampShopOnline` matches `Lamp Shop Online`), (2) first-word fallback, (3) multi-code suppliers — when a supplier has multiple entries with different work types (suffix after ` - `), the function scores each work description against the invoice text to pick the correct code. A warning is shown on the card when no mapping is found.
 
 ## Gotchas
 
@@ -42,6 +47,8 @@ Process example PDFs in `example-files/` against the test Excel file (`Maintenan
 - **Excel headers at row 5-6, not row 0** — The Maintenance PO workbook has 4-5 rows of title/color-legend before the actual header row.
 - **PO is optional** — Not all invoices have PO numbers. The pipeline handles PO-less invoices via fuzzy matching fallback.
 - **No AI/LLM tokens used** — The app is entirely rule-based (regex, fuzzy string matching, pandas). Claude Code wrote the code but the running app uses zero AI.
+- **Supplier name mismatch** — The generic extractor's `_identify_supplier()` returns names like `"LampShopOnline"` or `"MetSafe"`, which may not match the mapping table's `"Lamp Shop Online"` or `"Metro Security (UK) Limited (MetSafe)"`. The lookup handles this via space-stripped comparison, but new suppliers may need entries in both the extractor and the mapping.
+- **Cost centre file removed** — The Cost Centre Summary uploader was removed. Nominal codes come from JSON, and `ExcelReader.cost_centre_path` is now optional (defaults to `None`).
 
 ## UI / Styling
 
