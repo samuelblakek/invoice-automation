@@ -43,6 +43,16 @@ Process example PDFs in `example-files/` against the test Excel file (`Maintenan
 - **PO is optional** — Not all invoices have PO numbers. The pipeline handles PO-less invoices via fuzzy matching fallback.
 - **No AI/LLM tokens used** — The app is entirely rule-based (regex, fuzzy string matching, pandas). Claude Code wrote the code but the running app uses zero AI.
 
+## UI / Styling
+
+- **Layout**: V3 card board -- three-column (Matched / Review / Failed) with sidebar file uploaders
+- **Font**: Outfit (Google Fonts) -- single family for headings + body
+- **Palette**: Dark slate/navy (#0F1923 bg) with glassmorphism (rgba + backdrop-blur) cards
+- **Texture**: Layered radial gradients with subtle blue/purple colour glow, SVG noise/grain overlay, frosted glass cards + sidebar
+- **CSS**: All styling in GLOBAL_CSS constant at top of web_app.py, injected via st.markdown() -- uses ::after pseudo-element on .stApp for noise overlay (pointer-events: none)
+- **Streamlit theme**: .streamlit/config.toml must stay in sync with CSS colour tokens
+- **Icon fonts**: Material Symbols Rounded used by Streamlit for expander/sidebar icons -- font override rules must preserve these (see CSS comments)
+
 ## Lessons
 
 See `tasks/lessons.md` for accumulated patterns and corrections from development.

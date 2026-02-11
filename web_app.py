@@ -18,21 +18,21 @@ import pdfplumber
 
 
 # ---------------------------------------------------------------------------
-# Global CSS -- Inter font, neutral dark palette, card/badge/button styles
+# Global CSS -- Outfit font, dark slate/navy palette, glassmorphism + grain
 # ---------------------------------------------------------------------------
 GLOBAL_CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap');
 
 /* ---------- Font override ---------- */
 html, body, [class*="css"], .stMarkdown, .stText,
 .stSelectbox, .stMultiSelect, .stRadio, .stCheckbox,
 h1, h2, h3, h4, h5, h6, p, div, label, input, textarea, button, a {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
 }
-/* Apply Inter to spans, but NOT inside expander summaries where icon fonts live */
+/* Apply Outfit to spans, but NOT inside expander summaries where icon fonts live */
 span {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
 }
 /* Restore icon font for expander toggle arrows -- higher specificity beats the span rule */
 [data-testid="stExpander"] summary span,
@@ -47,27 +47,27 @@ details summary span {
     font-family: 'Material Symbols Rounded', sans-serif !important;
 }
 
-/* ---------- Colour tokens ---------- */
+/* ---------- Colour tokens (dark slate / navy) ---------- */
 :root {
-    --bg-primary:    #111111;
-    --bg-card:       #1A1A1A;
-    --bg-card-hover: #222222;
-    --bg-elevated:   #262626;
-    --border-subtle: #2A2A2A;
-    --border-medium: #3A3A3A;
-    --text-primary:  #F0F0F0;
-    --text-secondary:#999999;
-    --text-muted:    #666666;
-    --accent:        #F0F0F0;
+    --bg-primary:    #0F1923;
+    --bg-card:       rgba(255, 255, 255, 0.05);
+    --bg-card-hover: rgba(255, 255, 255, 0.08);
+    --bg-elevated:   rgba(255, 255, 255, 0.10);
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-medium: rgba(255, 255, 255, 0.15);
+    --text-primary:  #E2E8F0;
+    --text-secondary:#94A3B8;
+    --text-muted:    #64748B;
+    --accent:        #E2E8F0;
     --green:         #34D399;
-    --green-bg:      #0F2518;
-    --green-border:  #166534;
+    --green-bg:      rgba(52, 211, 153, 0.10);
+    --green-border:  rgba(52, 211, 153, 0.25);
     --amber:         #FBBF24;
-    --amber-bg:      #2A2008;
-    --amber-border:  #713F12;
+    --amber-bg:      rgba(251, 191, 36, 0.10);
+    --amber-border:  rgba(251, 191, 36, 0.25);
     --red:           #F87171;
-    --red-bg:        #2A0F0F;
-    --red-border:    #7F1D1D;
+    --red-bg:        rgba(248, 113, 113, 0.10);
+    --red-border:    rgba(248, 113, 113, 0.25);
 }
 
 /* ---------- Hide Streamlit branding ---------- */
@@ -86,27 +86,49 @@ header[data-testid="stHeader"] button span,
     font-family: 'Material Symbols Rounded', sans-serif !important;
 }
 
-/* ---------- Body background ---------- */
-.stApp { background-color: var(--bg-primary) !important; }
-
-/* ---------- Sidebar ---------- */
-section[data-testid="stSidebar"] {
-    background-color: var(--bg-card) !important;
-    border-right: 1px solid var(--border-subtle) !important;
+/* ---------- Body background (layered gradients with colour glow) ---------- */
+.stApp {
+    background:
+        radial-gradient(ellipse at 30% 20%, rgba(56, 189, 248, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 60%, rgba(139, 92, 246, 0.04) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 0%, #1A2A3A 0%, #0F1923 60%) !important;
 }
 
-/* ---------- Invoice card (shared) ---------- */
+/* ---------- Noise / grain overlay ---------- */
+.stApp::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 999;
+    opacity: 0.04;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='a' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23a)'/%3E%3C/svg%3E");
+    background-size: 200px;
+}
+
+/* ---------- Sidebar (frosted glass) ---------- */
+section[data-testid="stSidebar"] {
+    background: rgba(255, 255, 255, 0.03) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ---------- Invoice card (solid glass-like, no backdrop-filter to avoid scroll artefacts) ---------- */
 .inv-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
+    background: rgba(22, 34, 49, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 3px solid var(--card-accent, rgba(255, 255, 255, 0.08));
     border-radius: 10px;
     padding: 1.1rem 1.4rem;
     margin-bottom: 0.75rem;
-    transition: border-color 0.15s ease, background 0.15s ease;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 .inv-card:hover {
-    border-color: var(--border-medium);
-    background: var(--bg-card-hover);
+    background: rgba(26, 40, 56, 0.9);
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 .inv-card .inv-num {
     font-weight: 700;
@@ -176,9 +198,9 @@ section[data-testid="stSidebar"] {
 /* Primary buttons: warm neutral (white bg, dark text) */
 button[data-testid="stBaseButton-primary"],
 button[kind="primary"] {
-    background-color: #F0F0F0 !important;
-    border: 1px solid #F0F0F0 !important;
-    color: #111111 !important;
+    background-color: #E2E8F0 !important;
+    border: 1px solid #E2E8F0 !important;
+    color: #0F1923 !important;
     font-weight: 600 !important;
     border-radius: 8px !important;
     font-size: 0.85rem !important;
@@ -210,6 +232,22 @@ button[kind="secondary"]:hover {
     background-color: var(--bg-elevated) !important;
 }
 
+/* Reset button -- red destructive style (targeted via widget key) */
+.st-key-reset_app button {
+    background-color: transparent !important;
+    border: 1px solid var(--red-border) !important;
+    color: var(--red) !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    font-size: 0.85rem !important;
+    transition: all 0.15s ease !important;
+}
+.st-key-reset_app button:hover {
+    background-color: var(--red-bg) !important;
+    border-color: var(--red) !important;
+    color: var(--red) !important;
+}
+
 /* Download buttons -- normalise height */
 [data-testid="stDownloadButton"] button {
     border-radius: 8px !important;
@@ -232,10 +270,10 @@ button[kind="secondary"]:hover {
 # Helpers
 # ---------------------------------------------------------------------------
 
-def inv_card_html(inv, po=None, extra=""):
+def inv_card_html(inv, po=None, extra="", accent="var(--border-subtle)"):
     """Generate HTML for an invoice card."""
     po_line = f'<div class="inv-detail">PO: {po.po_number}  |  {po.store}</div>' if po else ""
-    return f'''<div class="inv-card">
+    return f'''<div class="inv-card" style="--card-accent:{accent}">
         <div class="inv-num">{inv.invoice_number}</div>
         <div class="inv-supplier">{inv.supplier_name}</div>
         <div class="inv-amount">&pound;{inv.net_amount:.2f}</div>
@@ -387,6 +425,13 @@ the Maintenance PO spreadsheet automatically.
 6. Approve in iCompleat
         """)
 
+    if st.session_state.get('processed'):
+        st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+        if st.button("Reset App", key="reset_app", use_container_width=True):
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.rerun()
+
 
 # ---------------------------------------------------------------------------
 # Main content
@@ -518,7 +563,7 @@ if st.session_state.get('processed'):
     with col_match:
         st.markdown(f'<div class="col-header col-header-green">Matched ({len(auto_results)})</div>', unsafe_allow_html=True)
         for r in auto_results:
-            st.markdown(inv_card_html(r.invoice, r.po_record), unsafe_allow_html=True)
+            st.markdown(inv_card_html(r.invoice, r.po_record, accent="var(--green)"), unsafe_allow_html=True)
 
     # --- Review column ---
     with col_review:
@@ -567,9 +612,9 @@ if st.session_state.get('processed'):
         for result in failed_results:
             err_html = "".join(f'<div class="inv-error">{e}</div>' for e in result.errors)
             if result.invoice:
-                st.markdown(inv_card_html(result.invoice, result.po_record, err_html), unsafe_allow_html=True)
+                st.markdown(inv_card_html(result.invoice, result.po_record, err_html, accent="var(--red)"), unsafe_allow_html=True)
             else:
-                st.markdown(f'''<div class="inv-card">
+                st.markdown(f'''<div class="inv-card" style="--card-accent:var(--red)">
                     <div class="inv-num">Extraction Error</div>
                     {err_html}
                 </div>''', unsafe_allow_html=True)

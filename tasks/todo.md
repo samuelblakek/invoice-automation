@@ -32,6 +32,26 @@
 - [x] Update `docs/deployment.md` — remove main.py from upload list
 - [x] Clean up `.gitignore` — remove CLI-only entries
 
+## Completed: V3 Card Board Layout
+
+- [x] Three-column board layout (Matched / Review / Failed)
+- [x] Sidebar file uploaders and process button
+- [x] Confirmation flow for near-miss invoices
+- [x] Download section with Updated Excel, CSV Summary, Detailed Report
+
+## Completed: Visual Polish (Dark Slate/Navy + Outfit + Glassmorphism)
+
+- [x] Swap font from Inter to Outfit (Google Fonts)
+- [x] Replace neutral dark palette with dark slate/navy (#0F1923)
+- [x] Glassmorphism cards -- rgba backgrounds, backdrop-filter blur, inset highlights
+- [x] Frosted glass sidebar with backdrop-blur
+- [x] Layered background gradients with subtle blue/purple colour glow
+- [x] SVG noise/grain overlay via ::after pseudo-element
+- [x] Card left-border accents (green for matched, red for failed)
+- [x] Stronger card shadows (4px/16px normal, 8px/24px hover)
+- [x] Update .streamlit/config.toml to match slate/navy palette
+- [x] Update CLAUDE.md with UI/Styling section
+
 ## Pending
 
 - [ ] User confirming results with colleague
