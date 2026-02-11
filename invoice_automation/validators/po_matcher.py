@@ -108,13 +108,21 @@ class POMatcher:
                 ))
 
                 if not invoice.po_number:
+                    match_fields = []
+                    if invoice.store_location:
+                        match_fields.append(f"store '{invoice.store_location}'")
+                    if invoice.supplier_name:
+                        match_fields.append(f"supplier '{invoice.supplier_name}'")
+                    if invoice.net_amount:
+                        match_fields.append(f"amount £{invoice.net_amount:.2f}")
+                    fields_str = ", ".join(match_fields) if match_fields else "available fields"
                     validations.append(Validation(
                         check_name="PO Number Warning",
-                        passed=True,
+                        passed=False,
                         expected="PO number on invoice",
                         actual="No PO found on invoice",
                         severity=ValidationSeverity.WARNING,
-                        message="No PO number found on invoice — matched using store/supplier/amount"
+                        message=f"No PO number on invoice — matched to PO '{best_record.po_number}' using {fields_str}"
                     ))
 
                 self._add_post_match_validations(invoice, best_record, validations)

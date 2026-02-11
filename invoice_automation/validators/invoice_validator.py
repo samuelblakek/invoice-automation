@@ -79,10 +79,6 @@ class InvoiceValidator:
         amount_validation = self._validate_amounts(invoice)
         result.add_validation(amount_validation)
 
-        # Step 5: Validate VAT calculation
-        vat_validation = self._validate_vat(invoice)
-        result.add_validation(vat_validation)
-
         # Finalize result
         result.finalize()
 
@@ -168,36 +164,3 @@ class InvoiceValidator:
             message=f"Amount validated: £{invoice.net_amount}"
         )
 
-    def _validate_vat(self, invoice: Invoice) -> Validation:
-        """Validate VAT calculation."""
-        if not invoice.net_amount or not invoice.vat_amount or not invoice.total_amount:
-            return Validation(
-                check_name="VAT Calculation",
-                passed=True,
-                expected="VAT calculation verified",
-                actual="Insufficient data",
-                severity=ValidationSeverity.INFO,
-                message="VAT calculation not verified (missing data)"
-            )
-
-        calculated_total = invoice.net_amount + invoice.vat_amount
-        tolerance = Decimal('0.02')  # 2p tolerance for rounding
-
-        if abs(calculated_total - invoice.total_amount) <= tolerance:
-            return Validation(
-                check_name="VAT Calculation",
-                passed=True,
-                expected=f"£{calculated_total:.2f}",
-                actual=f"£{invoice.total_amount:.2f}",
-                severity=ValidationSeverity.INFO,
-                message=f"VAT calculation correct: £{invoice.net_amount:.2f} + £{invoice.vat_amount:.2f} = £{invoice.total_amount:.2f}"
-            )
-
-        return Validation(
-            check_name="VAT Calculation",
-            passed=False,
-            expected=f"£{calculated_total:.2f}",
-            actual=f"£{invoice.total_amount:.2f}",
-            severity=ValidationSeverity.WARNING,
-            message=f"VAT calculation mismatch: Net £{invoice.net_amount:.2f} + VAT £{invoice.vat_amount:.2f} ≠ Total £{invoice.total_amount:.2f}"
-        )
