@@ -356,11 +356,11 @@ def lookup_nominal_code(supplier_name: str, rows: list[dict],
         if not matches:
             return ""
 
-    # Single match — return directly
+    # Single match  - return directly
     if len(matches) == 1:
         return matches[0][1]
 
-    # Multiple matches — score by work description overlap with invoice text
+    # Multiple matches  - score by work description overlap with invoice text
     if not invoice_lower:
         return matches[0][1]  # No invoice text to compare, return first
 
@@ -572,35 +572,44 @@ with st.sidebar:
 
     with st.expander("About"):
         st.markdown("""
-Extracts invoice data from PDFs, validates against PO records, and updates
-the Maintenance PO spreadsheet automatically.
+Extracts invoice data from PDFs, matches against Purchase Orders, assigns
+nominal codes, and updates the Maintenance PO spreadsheet automatically.
 
 **What it does:**
-1. Extract data from invoice PDFs
-2. Find matching Purchase Order records
-3. Validate against company policies
-4. Update your Excel spreadsheet
-5. Generate detailed reports
+1. Extract data from invoice PDFs (supplier, PO, amounts, store, description)
+2. Match to Purchase Order records (exact, invoice number search, or fuzzy)
+3. Look up the correct nominal code from the supplier mapping
+4. Validate amounts and flag anything that needs review
+5. Update your Excel spreadsheet with invoice number, amount, date, and nominal code
+6. Generate summary reports
 
-**Supported suppliers:** AAW, CJL, APS, Amazon, Compco, and others via generic extraction.
+**Nominal codes:** Managed in the Supplier Nominal Codes section in the sidebar. Codes are saved locally and persist between sessions. Suppliers with multiple work types are matched automatically based on invoice content.
 
-**Security:** All processing happens in your browser session. No data is stored on servers.
+**Supported suppliers:** Lamp Shop Online, CJL, APS, Metro Security, Compco, Aura, Sunbelt, and others via generic extraction.
+
+**Security:** All processing happens locally in your browser session. No data is sent to external servers.
         """)
 
     with st.expander("Help"):
         st.markdown("""
 **Common issues:**
-- **PO not found** -- Wrong Excel file or POs not yet created
-- **Amounts wrong** -- Amounts are NET (ex-VAT), which is correct
-- **Over £200 blocked** -- Check QUOTE OVER £200 and AUTHORISED columns
-- **Store mismatch** -- Fuzzy matching is used; low confidence flags for review
+- **PO not found** - Wrong Excel file, or POs not yet created
+- **Amounts wrong** - Amounts are NET (ex-VAT), which is correct
+- **Over 200 warning** - Check QUOTE OVER 200 and AUTHORISED columns
+- **Store mismatch** - Fuzzy matching is used; low confidence flags for review
+- **No nominal code** - Supplier not in the mapping table. Add them via the Supplier Nominal Codes section in the sidebar
+
+**Nominal code tips:**
+- For suppliers with one type of work, just add the supplier name and code
+- For suppliers with multiple work types, add separate entries with a description after a dash (e.g. "Metro Security - Safe Installation" and "Metro Security - Safe Removal")
+- The app matches invoice text against the description to pick the right code
 
 **Weekly workflow:**
 1. Export invoices from iCompleat as PDFs
-2. Upload PDFs + both Excel files here
+2. Upload PDFs and the Maintenance PO spreadsheet
 3. Click Process Invoices
-4. Review flagged invoices
-5. Download updated Excel
+4. Review any flagged invoices
+5. Download the updated Excel
 6. Approve in iCompleat
         """)
 
@@ -782,10 +791,10 @@ if st.session_state.get('processed'):
             decision = review_decisions.get(idx)
 
             if decision == "confirmed":
-                st.success(f"**{inv.invoice_number}** -- Confirmed")
+                st.success(f"**{inv.invoice_number}** - Confirmed")
                 continue
             elif decision == "skipped":
-                st.info(f"**{inv.invoice_number}** -- Skipped")
+                st.info(f"**{inv.invoice_number}** - Skipped")
                 continue
 
             with st.container(border=True):
