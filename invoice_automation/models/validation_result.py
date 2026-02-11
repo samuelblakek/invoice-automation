@@ -88,6 +88,20 @@ class ValidationResult:
         self.is_valid = not has_errors
         self.can_auto_update = self.is_valid and self.po_record is not None
 
+    @property
+    def needs_review(self) -> bool:
+        """Invoice has a PO match but needs user confirmation due to uncertain matching."""
+        if self.can_auto_update or self.po_record is None:
+            return False
+        # Reviewable if the only errors are store/match confidence issues
+        hard_errors = [v for v in self.validations
+                       if not v.passed and v.severity == ValidationSeverity.ERROR
+                       and v.check_name not in ("Store Match", "PO Match")]
+        # Not reviewable if PO is already invoiced
+        has_duplicate = any(v.check_name == "Duplicate Invoice Check" and not v.passed
+                           for v in self.validations)
+        return not hard_errors and not has_duplicate
+
     def get_status_summary(self) -> str:
         """Get a summary status string."""
         if self.can_auto_update:

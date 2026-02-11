@@ -51,7 +51,7 @@ class POMatcher:
                 expected="Known supplier type with mapped sheet",
                 actual=invoice.supplier_type,
                 severity=ValidationSeverity.ERROR,
-                message=f"Unknown supplier type '{invoice.supplier_type}', cannot determine sheet"
+                message=f"Unknown supplier type '{invoice.supplier_type}' — can't determine which Excel sheet to search. Process this invoice manually."
             ))
             return None, validations
 
@@ -120,7 +120,24 @@ class POMatcher:
                 self._add_post_match_validations(invoice, best_record, validations)
                 return best_record, validations
 
-            # Score too low — report closest candidates
+            # Score 25-39: return best candidate as reviewable near-miss
+            if best_score >= 25:
+                candidate_info = "; ".join(
+                    f"PO '{c[0].po_number}' store='{c[0].store}' (score={c[1]:.1f})"
+                    for c in candidates[:3]
+                )
+                validations.append(Validation(
+                    check_name="PO Match",
+                    passed=False,
+                    expected="Matching PO record with score >= {:.0f}".format(self.FUZZY_MATCH_THRESHOLD),
+                    actual=f"Best score {best_score:.1f}. Closest: {candidate_info}",
+                    severity=ValidationSeverity.ERROR,
+                    message=f"No confident match in sheet '{sheet_name}'. Closest: {candidate_info}. Check the PO exists and supplier/store are correct."
+                ))
+                self._add_post_match_validations(invoice, best_record, validations)
+                return best_record, validations
+
+            # Score below 25 — truly no match
             candidate_info = "; ".join(
                 f"PO '{c[0].po_number}' store='{c[0].store}' (score={c[1]:.1f})"
                 for c in candidates[:3]
@@ -131,7 +148,7 @@ class POMatcher:
                 expected="Matching PO record with score >= {:.0f}".format(self.FUZZY_MATCH_THRESHOLD),
                 actual=f"Best score {best_score:.1f}. Closest: {candidate_info}",
                 severity=ValidationSeverity.ERROR,
-                message=f"No confident match found in '{sheet_name}'. Closest candidates: {candidate_info}"
+                message=f"No confident match in sheet '{sheet_name}'. Closest: {candidate_info}. Check the PO exists and supplier/store are correct."
             ))
             return None, validations
 
@@ -143,7 +160,7 @@ class POMatcher:
             expected=f"Match in {sheet_name} sheet",
             actual=f"No match found ({details})",
             severity=ValidationSeverity.ERROR,
-            message=f"No matching PO record found in sheet '{sheet_name}' ({details})"
+            message=f"No matching PO found in sheet '{sheet_name}' ({details}). Check the PO exists in the spreadsheet."
         ))
         return None, validations
 
@@ -157,7 +174,7 @@ class POMatcher:
                 expected="PO not yet invoiced",
                 actual=f"Already invoiced: {po_record.invoice_no}",
                 severity=ValidationSeverity.ERROR,
-                message=f"PO '{po_record.po_number}' already has invoice number '{po_record.invoice_no}'"
+                message=f"PO '{po_record.po_number}' already invoiced as '{po_record.invoice_no}' (sheet '{po_record.sheet_name}', row {po_record.row_index + 1}). If this is a different invoice for the same PO, update manually."
             ))
         else:
             validations.append(Validation(
@@ -193,5 +210,5 @@ class POMatcher:
                     expected=po_record.store,
                     actual=f"{invoice.store_location} ({match_score}% match)",
                     severity=severity,
-                    message=f"Store name mismatch: invoice='{invoice.store_location}', PO='{po_record.store}' ({match_score}%)"
+                    message=f"Store mismatch: invoice says '{invoice.store_location}' but PO says '{po_record.store}' ({match_score}% match, sheet '{po_record.sheet_name}', row {po_record.row_index + 1})."
                 ))

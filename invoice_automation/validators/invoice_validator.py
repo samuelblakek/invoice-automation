@@ -150,7 +150,7 @@ class InvoiceValidator:
                 expected="Positive amount",
                 actual=f"£{invoice.net_amount}",
                 severity=ValidationSeverity.ERROR,
-                message=f"Invalid amount: £{invoice.net_amount} (must be positive)"
+                message=f"Extracted net amount is £{invoice.net_amount} which is invalid. Check the PDF — the amount may not have been read correctly."
             )
 
         if invoice.net_amount > Decimal('10000'):

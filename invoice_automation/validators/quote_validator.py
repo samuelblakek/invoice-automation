@@ -63,6 +63,9 @@ class QuoteValidator:
                 message=f"Quote authorized: Quote ref '{po_record.quote_over_200}', Authorized by '{po_record.authorized}'"
             )
 
+        sheet = po_record.sheet_name
+        row = po_record.row_index + 1
+
         # Case 2: Has quote reference but NO authorization → BLOCK
         if has_quote_ref and not has_authorization:
             return Validation(
@@ -71,7 +74,7 @@ class QuoteValidator:
                 expected="Quote reference AND authorization",
                 actual=f"Quote: {po_record.quote_over_200}, Auth: MISSING",
                 severity=ValidationSeverity.ERROR,
-                message=f"Invoice amount £{invoice.net_amount:.2f} exceeds £{self.threshold:.2f} - quote '{po_record.quote_over_200}' exists but NOT AUTHORIZED"
+                message=f"Invoice £{invoice.net_amount:.2f} exceeds £200 — quote '{po_record.quote_over_200}' exists but 'AUTHORISED' is empty (sheet '{sheet}', row {row}). Get authorization, fill in the column, then reprocess."
             )
 
         # Case 3: No quote reference at all → BLOCK
@@ -82,7 +85,7 @@ class QuoteValidator:
                 expected="Quote reference and authorization",
                 actual="No quote reference found",
                 severity=ValidationSeverity.ERROR,
-                message=f"Invoice amount £{invoice.net_amount:.2f} exceeds £{self.threshold:.2f} - NO QUOTE REFERENCE found (required for amounts over £{self.threshold:.2f})"
+                message=f"Invoice £{invoice.net_amount:.2f} exceeds £200 but 'QUOTE OVER £200' is empty (sheet '{sheet}', row {row}). Fill in the quote reference and 'AUTHORISED' columns, then reprocess."
             )
 
         # Case 4: Has authorization but no quote reference → BLOCK (shouldn't happen, but handle it)
@@ -92,5 +95,5 @@ class QuoteValidator:
             expected="Quote reference and authorization",
             actual=f"No quote ref, Auth: {po_record.authorized}",
             severity=ValidationSeverity.ERROR,
-            message=f"Invalid state: Authorization present but no quote reference"
+            message=f"Authorization present but no quote reference (sheet '{sheet}', row {row}). Fix the 'QUOTE OVER £200' column, then reprocess."
         )
