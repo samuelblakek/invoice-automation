@@ -323,6 +323,23 @@ class ExcelReader:
             return None
         return self.date_parser.parse_date(str(value))
 
+    def load_nominal_code_mapping(self) -> dict:
+        """Load supplier -> nominal code mapping from cost centre file tab 3."""
+        try:
+            df = pd.read_excel(
+                self.cost_centre_path,
+                sheet_name=2,  # Tab 3 (0-indexed)
+            )
+            mapping = {}
+            for _, row in df.iterrows():
+                supplier = str(row.iloc[0]).strip()
+                code = str(row.iloc[1]).strip()
+                if supplier and code and supplier != 'nan' and code != 'nan':
+                    mapping[supplier.lower()] = code
+            return mapping
+        except Exception:
+            return {}
+
     def get_store_list(self) -> List[str]:
         """Get list of all valid store names from Cost Centre Summary."""
         df = self.load_cost_centre_summary()

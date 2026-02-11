@@ -2,6 +2,7 @@
 Invoice Automation - Web Interface
 Simple drag-and-drop interface for invoice processing
 """
+import json
 import streamlit as st
 import tempfile
 from pathlib import Path
@@ -14,6 +15,7 @@ from invoice_automation.extractors import (
 )
 from invoice_automation.models import ValidationResult
 from invoice_automation.reports.report_generator import ReportGenerator
+import pandas as pd
 import pdfplumber
 
 
@@ -290,6 +292,41 @@ def inv_card_html(inv, po=None, extra="", accent="var(--border-subtle)"):
     </div>'''
 
 
+def lookup_nominal_code(supplier_name: str, mapping: dict) -> str:
+    """Find nominal code for supplier using case-insensitive substring matching."""
+    if not supplier_name or not mapping:
+        return ""
+    supplier_lower = supplier_name.lower()
+    for key, code in mapping.items():
+        if key in supplier_lower or supplier_lower in key:
+            return code
+    # Try matching on first word (e.g. "CJL" from "CJL Group Ltd")
+    first_word = supplier_lower.split()[0] if supplier_lower.split() else ""
+    if first_word and len(first_word) >= 3:
+        for key, code in mapping.items():
+            if first_word in key or key.startswith(first_word):
+                return code
+    return ""
+
+
+NOMINAL_CODES_PATH = Path(__file__).parent / "data" / "nominal_codes.json"
+
+
+def load_nominal_codes_from_disk() -> list[dict]:
+    """Load supplier→nominal code mapping from JSON file."""
+    if NOMINAL_CODES_PATH.exists():
+        with open(NOMINAL_CODES_PATH) as f:
+            return json.load(f)
+    return []
+
+
+def save_nominal_codes_to_disk(rows: list[dict]):
+    """Persist supplier→nominal code mapping to JSON file."""
+    NOMINAL_CODES_PATH.parent.mkdir(exist_ok=True)
+    with open(NOMINAL_CODES_PATH, "w") as f:
+        json.dump(rows, f, indent=2)
+
+
 def identify_supplier(pdf_path: Path, first_page_text: str) -> str:
     """Identify supplier from filename or PDF content."""
     filename_lower = pdf_path.name.lower()
@@ -395,6 +432,69 @@ with st.sidebar:
         key=f"cost_centre_uploader_{upload_gen}"
     )
 
+    # --- Nominal code mapping (always visible, backed by JSON file) ---
+    if 'nominal_mapping_rows' not in st.session_state:
+        st.session_state['nominal_mapping_rows'] = load_nominal_codes_from_disk()
+
+    with st.expander("Supplier Nominal Codes"):
+        mapping_df = pd.DataFrame(
+            st.session_state['nominal_mapping_rows']
+            if st.session_state['nominal_mapping_rows']
+            else [{"Supplier": "", "Nominal Code": ""}]
+        )
+        edited_df = st.data_editor(
+            mapping_df,
+            num_rows="dynamic",
+            use_container_width=True,
+            key="nominal_editor"
+        )
+        st.session_state['nominal_mapping_rows'] = edited_df.to_dict('records')
+
+        col_save, col_import = st.columns(2)
+        with col_save:
+            if st.button("Save", use_container_width=True, key="save_nominal"):
+                # Filter out empty rows before saving
+                clean = [
+                    r for r in st.session_state['nominal_mapping_rows']
+                    if str(r.get('Supplier', '')).strip()
+                    and str(r.get('Nominal Code', '')).strip()
+                ]
+                save_nominal_codes_to_disk(clean)
+                st.session_state['nominal_mapping_rows'] = clean
+                st.toast("Nominal codes saved")
+        with col_import:
+            if cost_centre and st.button("Import from File", use_container_width=True,
+                                         key="import_nominal"):
+                with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
+                    tmp.write(cost_centre.getvalue())
+                    tmp_path = tmp.name
+                try:
+                    reader = ExcelReader(Path(tmp_path), Path(tmp_path))
+                    raw_mapping = reader.load_nominal_code_mapping()
+                    new_rows = [
+                        {"Supplier": k.title(), "Nominal Code": v}
+                        for k, v in raw_mapping.items()
+                    ]
+                    # Merge: add any suppliers not already present
+                    existing = {
+                        str(r.get('Supplier', '')).strip().lower()
+                        for r in st.session_state['nominal_mapping_rows']
+                    }
+                    merged = list(st.session_state['nominal_mapping_rows'])
+                    added = 0
+                    for row in new_rows:
+                        if row['Supplier'].strip().lower() not in existing:
+                            merged.append(row)
+                            added += 1
+                    st.session_state['nominal_mapping_rows'] = merged
+                    save_nominal_codes_to_disk(merged)
+                    st.toast(f"Imported {added} new supplier(s)")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Import failed: {e}")
+                finally:
+                    Path(tmp_path).unlink(missing_ok=True)
+
     st.markdown("")
     all_files_uploaded = bool(invoice_pdfs and maintenance_po and cost_centre)
     process_button = st.button(
@@ -445,6 +545,7 @@ the Maintenance PO spreadsheet automatically.
         next_gen = st.session_state.get('upload_gen', 0) + 1
         st.session_state.clear()
         st.session_state['upload_gen'] = next_gen
+        st.session_state['nominal_mapping_rows'] = load_nominal_codes_from_disk()
         st.rerun()
 
 
@@ -512,16 +613,28 @@ if process_button and all_files_uploaded:
             progress_bar.empty()
             status_text.empty()
 
+            # Build nominal code lookup dict from session state
+            nominal_mapping = {}
+            for row in st.session_state.get('nominal_mapping_rows', []):
+                supplier = str(row.get('Supplier', '')).strip()
+                code = str(row.get('Nominal Code', '')).strip()
+                if supplier and code:
+                    nominal_mapping[supplier.lower()] = code
+
             # Write auto-updated results to Excel
             with ExcelWriter(maintenance_path, create_backup=False) as writer:
                 for result in results:
                     if result.can_auto_update:
+                        nom_code = lookup_nominal_code(
+                            result.invoice.supplier_name, nominal_mapping
+                        )
                         writer.update_po_record(
                             result.po_record.sheet_name,
                             result.po_record.row_index,
                             result.invoice.invoice_number,
                             result.invoice.net_amount,
-                            datetime.now()
+                            datetime.now(),
+                            nominal_code=nom_code
                         )
 
             # Read updated Excel into memory (auto-updates applied)
@@ -642,6 +755,14 @@ if st.session_state.get('processed'):
 
     # If there are confirmed items that need writing, rebuild the Excel
     if confirmed_indices and all_reviewed and not st.session_state.get('reviews_written'):
+        # Build nominal code lookup dict from session state
+        nominal_mapping = {}
+        for row in st.session_state.get('nominal_mapping_rows', []):
+            supplier = str(row.get('Supplier', '')).strip()
+            code = str(row.get('Nominal Code', '')).strip()
+            if supplier and code:
+                nominal_mapping[supplier.lower()] = code
+
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             maintenance_path = temp_path / "maintenance.xlsx"
@@ -650,12 +771,16 @@ if st.session_state.get('processed'):
             with ExcelWriter(maintenance_path, create_backup=False) as writer:
                 for idx in confirmed_indices:
                     result = review_results[idx]
+                    nom_code = lookup_nominal_code(
+                        result.invoice.supplier_name, nominal_mapping
+                    )
                     writer.update_po_record(
                         result.po_record.sheet_name,
                         result.po_record.row_index,
                         result.invoice.invoice_number,
                         result.invoice.net_amount,
-                        datetime.now()
+                        datetime.now(),
+                        nominal_code=nom_code
                     )
 
             with open(maintenance_path, 'rb') as f:

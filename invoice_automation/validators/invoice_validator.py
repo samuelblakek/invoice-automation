@@ -1,7 +1,6 @@
 """
 Invoice validator orchestrator - coordinates all validation checks.
 """
-from pathlib import Path
 from decimal import Decimal
 
 from ..models import Invoice, ValidationResult, Validation, ValidationSeverity
@@ -27,8 +26,6 @@ class InvoiceValidator:
 
         # Load reference data
         self.po_matcher.load_sheets()
-        self.cost_centre_df = excel_reader.load_cost_centre_summary()
-        self.codes_df = excel_reader.load_codes_sheet()
 
     def validate(self, invoice: Invoice) -> ValidationResult:
         """
@@ -83,55 +80,6 @@ class InvoiceValidator:
         result.finalize()
 
         return result
-
-    def _validate_nominal_code(self, invoice: Invoice, po_record) -> Validation:
-        """Validate nominal code matches expectations."""
-        invoice_code = invoice.nominal_code
-        po_code = po_record.nominal_code
-
-        # If neither has a code, it's a warning
-        if not invoice_code and not po_code:
-            return Validation(
-                check_name="Nominal Code",
-                passed=True,  # Don't block, but flag
-                expected="Nominal code present",
-                actual="Missing from both invoice and PO",
-                severity=ValidationSeverity.WARNING,
-                message="Nominal code missing from both invoice and PO record"
-            )
-
-        # If both have codes and they match
-        if invoice_code and po_code and invoice_code == po_code:
-            return Validation(
-                check_name="Nominal Code",
-                passed=True,
-                expected=po_code,
-                actual=invoice_code,
-                severity=ValidationSeverity.INFO,
-                message=f"Nominal code matches: {invoice_code}"
-            )
-
-        # If they don't match
-        if invoice_code and po_code and invoice_code != po_code:
-            return Validation(
-                check_name="Nominal Code",
-                passed=False,
-                expected=po_code,
-                actual=invoice_code,
-                severity=ValidationSeverity.WARNING,  # Warning, not error
-                message=f"Nominal code mismatch: invoice={invoice_code}, PO={po_code}"
-            )
-
-        # If only one has a code, it's acceptable
-        code = invoice_code or po_code
-        return Validation(
-            check_name="Nominal Code",
-            passed=True,
-            expected="Nominal code present",
-            actual=code,
-            severity=ValidationSeverity.INFO,
-            message=f"Nominal code: {code} (from {'invoice' if invoice_code else 'PO'})"
-        )
 
     def _validate_amounts(self, invoice: Invoice) -> Validation:
         """Validate amounts are positive and reasonable."""

@@ -38,7 +38,8 @@ class ExcelWriter:
 
     def update_po_record(self, sheet_name: str, row_index: int,
                         invoice_number: str, invoice_amount: Decimal,
-                        invoice_signed_date: datetime) -> bool:
+                        invoice_signed_date: datetime,
+                        nominal_code: str = "") -> bool:
         """
         Update a PO record with invoice details.
 
@@ -48,6 +49,7 @@ class ExcelWriter:
             invoice_number: Invoice number
             invoice_amount: Invoice amount (ex-VAT)
             invoice_signed_date: Date invoice was signed
+            nominal_code: Nominal code to write (only if cell is empty)
 
         Returns:
             True if update successful, False otherwise
@@ -85,6 +87,14 @@ class ExcelWriter:
             ws.cell(row=excel_row, column=col_invoice_no).value = invoice_number
             ws.cell(row=excel_row, column=col_invoice_amount).value = float(invoice_amount)
             ws.cell(row=excel_row, column=col_invoice_signed).value = invoice_signed_date
+
+            # Write nominal code if provided and cell is currently empty
+            if nominal_code:
+                col_nominal = self._find_column(ws, header_row, 'NOMINAL CODE')
+                if col_nominal:
+                    existing = ws.cell(row=excel_row, column=col_nominal).value
+                    if not existing or str(existing).strip() == '':
+                        ws.cell(row=excel_row, column=col_nominal).value = nominal_code
 
             # Highlight the entire row light blue to mark it as processed
             for col in range(1, ws.max_column + 1):
