@@ -361,23 +361,30 @@ st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
 with st.sidebar:
     st.markdown("#### Upload Files")
 
+    # Counter used to generate unique widget keys -- incrementing it forces
+    # Streamlit to recreate the file uploaders, clearing uploaded files.
+    upload_gen = st.session_state.get('upload_gen', 0)
+
     invoice_pdfs = st.file_uploader(
         "Invoice PDFs",
         type=['pdf'],
         accept_multiple_files=True,
-        help="Upload all invoice PDFs you want to process"
+        help="Upload all invoice PDFs you want to process",
+        key=f"pdf_uploader_{upload_gen}"
     )
 
     maintenance_po = st.file_uploader(
         "Maintenance PO Spreadsheet",
         type=['xlsx'],
-        help="Your Maintenance PO's Excel file"
+        help="Your Maintenance PO's Excel file",
+        key=f"maintenance_uploader_{upload_gen}"
     )
 
     cost_centre = st.file_uploader(
         "Cost Centre Summary",
         type=['xlsx'],
-        help="Cost Centre Summary (Addresses & Nominal Codes)"
+        help="Cost Centre Summary (Addresses & Nominal Codes)",
+        key=f"cost_centre_uploader_{upload_gen}"
     )
 
     st.markdown("")
@@ -427,8 +434,9 @@ the Maintenance PO spreadsheet automatically.
 
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
     if st.button("Reset App", key="reset_app", use_container_width=True):
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
+        next_gen = st.session_state.get('upload_gen', 0) + 1
+        st.session_state.clear()
+        st.session_state['upload_gen'] = next_gen
         st.rerun()
 
 
