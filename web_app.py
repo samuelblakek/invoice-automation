@@ -616,6 +616,17 @@ the Maintenance PO spreadsheet automatically.
 # ---------------------------------------------------------------------------
 # Main content
 # ---------------------------------------------------------------------------
+import base64
+_logo_path = Path(__file__).parent / "assets" / "menkind-logo.jpg"
+if _logo_path.exists():
+    _logo_b64 = base64.b64encode(_logo_path.read_bytes()).decode()
+    st.markdown(
+        f'<div style="display:flex;flex-direction:column;align-items:flex-start;gap:0.5rem;margin-bottom:0.25rem">'
+        f'<img src="data:image/jpeg;base64,{_logo_b64}" '
+        f'style="width:52px;height:52px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.3)" />'
+        f'</div>',
+        unsafe_allow_html=True
+    )
 st.markdown("## Menkind Maintenance PO Processing")
 
 # Empty state -- no files uploaded
