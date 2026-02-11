@@ -425,12 +425,11 @@ the Maintenance PO spreadsheet automatically.
 6. Approve in iCompleat
         """)
 
-    if st.session_state.get('processed'):
-        st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
-        if st.button("Reset App", key="reset_app", use_container_width=True):
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
-            st.rerun()
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+    if st.button("Reset App", key="reset_app", use_container_width=True):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
 
 
 # ---------------------------------------------------------------------------
