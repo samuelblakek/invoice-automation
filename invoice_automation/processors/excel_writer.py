@@ -113,8 +113,10 @@ class ExcelWriter:
         for row_num in range(1, min(20, ws.max_row + 1)):  # Check first 20 rows
             for cell in ws[row_num]:
                 if cell.value and isinstance(cell.value, str):
-                    value_upper = cell.value.upper()
-                    if 'PO' in value_upper or 'INVOICE NO' in value_upper:
+                    value_upper = cell.value.strip().upper()
+                    # Require exact match for 'PO' to avoid matching titles
+                    # like "Maintenance - PO's & Outstanding..."
+                    if value_upper == 'PO' or 'INVOICE NO' in value_upper:
                         return row_num
         return None
 
