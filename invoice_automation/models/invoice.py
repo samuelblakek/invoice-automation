@@ -1,6 +1,7 @@
 """
 Invoice data model for representing extracted PDF invoice data.
 """
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
@@ -29,6 +30,7 @@ class Invoice:
         pdf_path: Path to the source PDF file
         extracted_fields: Dictionary of all extracted fields
     """
+
     invoice_number: str
     invoice_date: Optional[datetime]
     supplier_name: str

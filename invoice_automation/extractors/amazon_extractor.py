@@ -1,6 +1,7 @@
 """
 Amazon Business invoice extractor.
 """
+
 from pathlib import Path
 from decimal import Decimal
 import re
@@ -38,7 +39,9 @@ class AmazonExtractor(BaseExtractor):
         # Extract invoice number
         invoice_number = self._extract_invoice_number(text)
         if not invoice_number:
-            raise PDFExtractionError("Could not extract invoice number from Amazon invoice")
+            raise PDFExtractionError(
+                "Could not extract invoice number from Amazon invoice"
+            )
 
         # Extract PO number
         po_number, _nominal_code, store_from_po = self._extract_po_and_code(text)
@@ -69,13 +72,13 @@ class AmazonExtractor(BaseExtractor):
             po_number=po_number,
             store_location=store_location,
             store_address=store_address,
-            net_amount=net_amount or Decimal('0'),
-            vat_amount=vat_amount or Decimal('0'),
+            net_amount=net_amount or Decimal("0"),
+            vat_amount=vat_amount or Decimal("0"),
             total_amount=total_amount,
             nominal_code=nominal_code,
             description=description,
             raw_text=text,
-            pdf_path=str(pdf_path)
+            pdf_path=str(pdf_path),
         )
 
         self._validate_required_fields(invoice)
@@ -85,16 +88,16 @@ class AmazonExtractor(BaseExtractor):
     def _extract_invoice_number(self, text: str) -> str:
         """Extract invoice number."""
         # Pattern: "Invoice # GB5Q1QGABEY" or "Invoice #\nGB5Q1QGABEY"
-        match = re.search(r'Invoice\s*#\s*\n?\s*([A-Z0-9]{10,})', text, re.IGNORECASE)
+        match = re.search(r"Invoice\s*#\s*\n?\s*([A-Z0-9]{10,})", text, re.IGNORECASE)
         if match:
             return match.group(1)
 
         # Fallback: look for alphanumeric code after "Invoice #"
-        match = re.search(r'Invoice\s*#\s*([A-Z0-9]+)', text, re.IGNORECASE)
+        match = re.search(r"Invoice\s*#\s*([A-Z0-9]+)", text, re.IGNORECASE)
         if match:
             inv_num = match.group(1)
             # Filter out common words that aren't invoice numbers
-            if inv_num.upper() not in ['DATE', 'NUMBER', 'NO', 'INVOICE']:
+            if inv_num.upper() not in ["DATE", "NUMBER", "NO", "INVOICE"]:
                 return inv_num
 
         return ""
@@ -110,7 +113,9 @@ class AmazonExtractor(BaseExtractor):
             Tuple of (po_number, nominal_code, store_name)
         """
         # Pattern: "PO # ORD816 (Leicester 7820)"
-        match = re.search(r'PO #?\s*(ORD\d{3,4})\s*\(([^)]+?)\s*(\d{4})\)', text, re.IGNORECASE)
+        match = re.search(
+            r"PO #?\s*(ORD\d{3,4})\s*\(([^)]+?)\s*(\d{4})\)", text, re.IGNORECASE
+        )
         if match:
             po_number = match.group(1).upper()
             store_name = match.group(2).strip()
@@ -118,7 +123,7 @@ class AmazonExtractor(BaseExtractor):
             return po_number, nominal_code, store_name
 
         # Fallback: just get PO number
-        match = re.search(r'PO #?\s*(ORD\d{3,4})', text, re.IGNORECASE)
+        match = re.search(r"PO #?\s*(ORD\d{3,4})", text, re.IGNORECASE)
         if match:
             return match.group(1).upper(), None, None
 
@@ -127,7 +132,9 @@ class AmazonExtractor(BaseExtractor):
     def _extract_invoice_date(self, text: str) -> any:
         """Extract invoice date."""
         # Pattern: "Invoice date 3 April 2025"
-        match = re.search(r'Invoice date\s*(\d{1,2}\s+\w+\s+\d{4})', text, re.IGNORECASE)
+        match = re.search(
+            r"Invoice date\s*(\d{1,2}\s+\w+\s+\d{4})", text, re.IGNORECASE
+        )
         if match:
             date_str = match.group(1)
             return self.date_parser.parse_date(date_str)
@@ -143,24 +150,29 @@ class AmazonExtractor(BaseExtractor):
         store_location = store_from_po or ""
 
         # Pattern: "Delivery address\n...\nMenkind\nLeicester..."
-        match = re.search(r'Delivery address(.*?)(?:Sold by|$)', text, re.IGNORECASE | re.DOTALL)
+        match = re.search(
+            r"Delivery address(.*?)(?:Sold by|$)", text, re.IGNORECASE | re.DOTALL
+        )
         if match:
             delivery_text = match.group(1).strip()
-            lines = [line.strip() for line in delivery_text.split('\n') if line.strip()]
+            lines = [line.strip() for line in delivery_text.split("\n") if line.strip()]
 
             # Find lines with store info
             for line in lines:
-                if 'menkind' in line.lower():
+                if "menkind" in line.lower():
                     # Next line might be store location
                     idx = lines.index(line)
                     if idx + 1 < len(lines):
                         potential_store = lines[idx + 1]
                         # Check if it's a store name (not an address line)
-                        if not re.match(r'\d+', potential_store) and len(potential_store) < 30:
+                        if (
+                            not re.match(r"\d+", potential_store)
+                            and len(potential_store) < 30
+                        ):
                             if not store_location:
                                 store_location = potential_store
 
-            store_address = ' '.join(lines)
+            store_address = " ".join(lines)
             return store_location, store_address
 
         return store_location, ""
@@ -180,14 +192,16 @@ class AmazonExtractor(BaseExtractor):
         total_amount = None
 
         # Extract Total payable (includes VAT)
-        match = re.search(r'Total payable\s+£([\d,]+\.?\d*)', text, re.IGNORECASE)
+        match = re.search(r"Total payable\s+£([\d,]+\.?\d*)", text, re.IGNORECASE)
         if match:
             total_amount = self.amount_parser.parse_amount(match.group(1))
 
         # Look for the detailed breakdown (usually on page 2)
         # Pattern: "Total £19.96 £4.00" where first is net, second is VAT
         # or "Item subtotal excl. VAT" section
-        match = re.search(r'Total\s+£([\d,]+\.?\d*)\s+£([\d,]+\.?\d*)', text, re.IGNORECASE)
+        match = re.search(
+            r"Total\s+£([\d,]+\.?\d*)\s+£([\d,]+\.?\d*)", text, re.IGNORECASE
+        )
         if match:
             net_amount = self.amount_parser.parse_amount(match.group(1))
             vat_amount = self.amount_parser.parse_amount(match.group(2))
@@ -195,7 +209,9 @@ class AmazonExtractor(BaseExtractor):
         # Alternative: look for VAT rate table
         # Pattern: "20.0 % £19.96 £4.00"
         if not net_amount:
-            match = re.search(r'20\.0\s*%\s+£([\d,]+\.?\d*)\s+£([\d,]+\.?\d*)', text, re.IGNORECASE)
+            match = re.search(
+                r"20\.0\s*%\s+£([\d,]+\.?\d*)\s+£([\d,]+\.?\d*)", text, re.IGNORECASE
+            )
             if match:
                 net_amount = self.amount_parser.parse_amount(match.group(1))
                 vat_amount = self.amount_parser.parse_amount(match.group(2))
@@ -203,7 +219,7 @@ class AmazonExtractor(BaseExtractor):
         # Calculate missing values if we only have total
         if total_amount and not net_amount:
             # Assume 20% VAT
-            net_amount = total_amount / Decimal('1.20')
+            net_amount = total_amount / Decimal("1.20")
             vat_amount = total_amount - net_amount
 
         return net_amount, vat_amount, total_amount
@@ -212,11 +228,15 @@ class AmazonExtractor(BaseExtractor):
         """Extract order description."""
         # Look for product names in the text
         # Pattern: Item descriptions usually after "Order information"
-        match = re.search(r'Order information(.*?)(?:Remit to|Page \d)', text, re.IGNORECASE | re.DOTALL)
+        match = re.search(
+            r"Order information(.*?)(?:Remit to|Page \d)",
+            text,
+            re.IGNORECASE | re.DOTALL,
+        )
         if match:
             order_info = match.group(1).strip()
             # Clean up
-            description = ' '.join(order_info.split())
+            description = " ".join(order_info.split())
             return description[:500]
 
         return "Amazon Business Order"

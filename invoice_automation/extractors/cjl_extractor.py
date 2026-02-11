@@ -1,8 +1,8 @@
 """
 CJL Group invoice extractor.
 """
+
 from pathlib import Path
-from decimal import Decimal
 import re
 
 from .base_extractor import BaseExtractor, PDFExtractionError
@@ -40,7 +40,9 @@ class CJLExtractor(BaseExtractor):
         # Extract invoice number
         invoice_number = self._extract_invoice_number(text)
         if not invoice_number:
-            raise PDFExtractionError("Could not extract invoice number from CJL invoice")
+            raise PDFExtractionError(
+                "Could not extract invoice number from CJL invoice"
+            )
 
         # Extract PO number
         po_number = self._extract_po_number(text)
@@ -78,7 +80,7 @@ class CJLExtractor(BaseExtractor):
             nominal_code=nominal_code,
             description=description,
             raw_text=text,
-            pdf_path=str(pdf_path)
+            pdf_path=str(pdf_path),
         )
 
         self._validate_required_fields(invoice)
@@ -88,7 +90,7 @@ class CJLExtractor(BaseExtractor):
     def _extract_invoice_number(self, text: str) -> str:
         """Extract invoice number."""
         # Pattern: "Invoice\n# 28564" or "Invoice # 28564"
-        match = re.search(r'Invoice[^\d]*#?\s*(\d+)', text, re.IGNORECASE)
+        match = re.search(r"Invoice[^\d]*#?\s*(\d+)", text, re.IGNORECASE)
         if match:
             return match.group(1)
         return ""
@@ -102,12 +104,12 @@ class CJLExtractor(BaseExtractor):
         - "CJL316"
         """
         # Pattern: "P.O.# : 110075/CJL316" or similar
-        match = re.search(r'P\.O\.#?\s*:?\s*(?:\d+/)?(CJL\d{3})', text, re.IGNORECASE)
+        match = re.search(r"P\.O\.#?\s*:?\s*(?:\d+/)?(CJL\d{3})", text, re.IGNORECASE)
         if match:
             return match.group(1).upper()
 
         # Fallback: look for CJL followed by 3 digits
-        match = re.search(r'(CJL\d{3})', text, re.IGNORECASE)
+        match = re.search(r"(CJL\d{3})", text, re.IGNORECASE)
         if match:
             return match.group(1).upper()
 
@@ -116,7 +118,9 @@ class CJLExtractor(BaseExtractor):
     def _extract_invoice_date(self, text: str) -> any:
         """Extract invoice date."""
         # Pattern: "Invoice Date : 12 May 2025"
-        match = re.search(r'Invoice Date\s*:?\s*(\d{1,2}\s+\w+\s+\d{4})', text, re.IGNORECASE)
+        match = re.search(
+            r"Invoice Date\s*:?\s*(\d{1,2}\s+\w+\s+\d{4})", text, re.IGNORECASE
+        )
         if match:
             date_str = match.group(1)
             return self.date_parser.parse_date(date_str)
@@ -130,17 +134,19 @@ class CJLExtractor(BaseExtractor):
             Tuple of (store_location, store_address)
         """
         # Pattern: "Subject :\n<store info>"
-        match = re.search(r'Subject\s*:(.*?)(?:#\s*Item|$)', text, re.IGNORECASE | re.DOTALL)
+        match = re.search(
+            r"Subject\s*:(.*?)(?:#\s*Item|$)", text, re.IGNORECASE | re.DOTALL
+        )
         if match:
             subject_text = match.group(1).strip()
 
             # Clean up multi-line subject
-            lines = [line.strip() for line in subject_text.split('\n') if line.strip()]
+            lines = [line.strip() for line in subject_text.split("\n") if line.strip()]
 
             # Last significant line is usually the store location
             if lines:
                 store_location = lines[-1]  # e.g., "Portsmouth"
-                store_address = ' '.join(lines)
+                store_address = " ".join(lines)
                 return store_location, store_address
 
         return "", ""
@@ -158,19 +164,19 @@ class CJLExtractor(BaseExtractor):
 
         # Extract Sub Total (net)
         # Pattern: "Sub Total 518.00"
-        match = re.search(r'Sub Total\s+([\d,]+\.?\d*)', text, re.IGNORECASE)
+        match = re.search(r"Sub Total\s+([\d,]+\.?\d*)", text, re.IGNORECASE)
         if match:
             net_amount = self.amount_parser.parse_amount(match.group(1))
 
         # Extract VAT
         # Pattern: "Standard Rate (20%) 103.60"
-        match = re.search(r'Standard Rate[^0-9]+([\d,]+\.?\d*)', text, re.IGNORECASE)
+        match = re.search(r"Standard Rate[^0-9]+([\d,]+\.?\d*)", text, re.IGNORECASE)
         if match:
             vat_amount = self.amount_parser.parse_amount(match.group(1))
 
         # Extract total
         # Pattern: "Total £621.60"
-        match = re.search(r'Total\s+£([\d,]+\.?\d*)', text, re.IGNORECASE)
+        match = re.search(r"Total\s+£([\d,]+\.?\d*)", text, re.IGNORECASE)
         if match:
             total_amount = self.amount_parser.parse_amount(match.group(1))
 
@@ -187,18 +193,24 @@ class CJLExtractor(BaseExtractor):
     def _extract_description(self, text: str) -> str:
         """Extract works description from the item description."""
         # Pattern: "# Item & Description ... <description>"
-        match = re.search(r'Item & Description.*?\d+\s+(.+?)\s+\d+\.\d+\s+\d+\.\d+', text, re.IGNORECASE | re.DOTALL)
+        match = re.search(
+            r"Item & Description.*?\d+\s+(.+?)\s+\d+\.\d+\s+\d+\.\d+",
+            text,
+            re.IGNORECASE | re.DOTALL,
+        )
         if match:
             description = match.group(1).strip()
             # Clean up multi-line description
-            description = ' '.join(description.split())
+            description = " ".join(description.split())
             return description[:500]  # Limit length
 
         # Fallback: use Subject if item description not found
-        match = re.search(r'Subject\s*:(.*?)(?:#\s*Item|$)', text, re.IGNORECASE | re.DOTALL)
+        match = re.search(
+            r"Subject\s*:(.*?)(?:#\s*Item|$)", text, re.IGNORECASE | re.DOTALL
+        )
         if match:
             description = match.group(1).strip()
-            description = ' '.join(description.split())
+            description = " ".join(description.split())
             return description[:500]
 
         return ""

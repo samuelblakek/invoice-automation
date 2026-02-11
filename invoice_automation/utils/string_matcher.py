@@ -1,6 +1,7 @@
 """
 String matching utilities for fuzzy matching and pattern extraction.
 """
+
 from typing import Optional, Tuple, List
 import re
 from fuzzywuzzy import fuzz
@@ -11,12 +12,12 @@ class StringMatcher:
 
     # PO number patterns for different suppliers
     PO_PATTERNS = {
-        'AAW': r'PS\d{10,12}',
-        'CJL': r'CJL\d{3}',
-        'AMAZON': r'ORD\d{3,4}',
-        'COMPCO': r'ER\d{2}/\d{5}',
-        'APS': r'[A-Z]{2}\d{2}/\d{5}',  # Generic pattern
-        'GENERIC': r'[A-Z]{2,4}\d{3,6}',  # Fallback pattern
+        "AAW": r"PS\d{10,12}",
+        "CJL": r"CJL\d{3}",
+        "AMAZON": r"ORD\d{3,4}",
+        "COMPCO": r"ER\d{2}/\d{5}",
+        "APS": r"[A-Z]{2}\d{2}/\d{5}",  # Generic pattern
+        "GENERIC": r"[A-Z]{2,4}\d{3,6}",  # Fallback pattern
     }
 
     @staticmethod
@@ -86,15 +87,17 @@ class StringMatcher:
         s = s.lower()
 
         # Remove common punctuation
-        s = re.sub(r'[,.\-_/\\]', ' ', s)
+        s = re.sub(r"[,.\-_/\\]", " ", s)
 
         # Remove extra whitespace
-        s = ' '.join(s.split())
+        s = " ".join(s.split())
 
         return s
 
     @staticmethod
-    def extract_po_number(text: str, supplier_type: Optional[str] = None) -> Optional[str]:
+    def extract_po_number(
+        text: str, supplier_type: Optional[str] = None
+    ) -> Optional[str]:
         """
         Extract PO number from text using pattern matching.
 
@@ -143,34 +146,36 @@ class StringMatcher:
             return None
 
         # Pattern 1: "Menkind Limited - StoreName - ..."
-        match = re.search(r'Menkind Limited\s*-\s*([^-\n]+)', address, re.IGNORECASE)
+        match = re.search(r"Menkind Limited\s*-\s*([^-\n]+)", address, re.IGNORECASE)
         if match:
             return match.group(1).strip()
 
         # Pattern 2: "Site: StoreName"
-        match = re.search(r'Site:\s*([^\n]+)', address, re.IGNORECASE)
+        match = re.search(r"Site:\s*([^\n]+)", address, re.IGNORECASE)
         if match:
             store_part = match.group(1).strip()
             # Remove trailing address parts
-            if '-' in store_part:
-                return store_part.split('-')[0].strip()
+            if "-" in store_part:
+                return store_part.split("-")[0].strip()
             return store_part
 
         # Pattern 3: Look for common UK location names
         # Extract first line or first significant part
-        lines = address.split('\n')
+        lines = address.split("\n")
         if lines:
             first_line = lines[0].strip()
             # Remove company name if present
-            first_line = re.sub(r'Menkind Limited', '', first_line, flags=re.IGNORECASE)
-            first_line = first_line.strip('-,. ')
+            first_line = re.sub(r"Menkind Limited", "", first_line, flags=re.IGNORECASE)
+            first_line = first_line.strip("-,. ")
             if first_line:
                 return first_line
 
         return None
 
     @staticmethod
-    def find_best_match(query: str, choices: List[str], threshold: int = 70) -> Tuple[Optional[str], int]:
+    def find_best_match(
+        query: str, choices: List[str], threshold: int = 70
+    ) -> Tuple[Optional[str], int]:
         """
         Find the best matching string from a list of choices.
 
@@ -223,7 +228,7 @@ class StringMatcher:
             return None
 
         # Look for 4-digit nominal codes
-        match = re.search(r'\b(7\d{3})\b', text)
+        match = re.search(r"\b(7\d{3})\b", text)
         if match:
             return match.group(1)
 
@@ -245,6 +250,8 @@ class StringMatcher:
 
         # Remove whitespace and common prefixes
         invoice_num = invoice_num.strip()
-        invoice_num = re.sub(r'^(invoice|inv|#)\s*', '', invoice_num, flags=re.IGNORECASE)
+        invoice_num = re.sub(
+            r"^(invoice|inv|#)\s*", "", invoice_num, flags=re.IGNORECASE
+        )
 
         return invoice_num

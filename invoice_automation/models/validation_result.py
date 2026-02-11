@@ -1,6 +1,7 @@
 """
 Validation Result data models for tracking invoice validation outcomes.
 """
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional, Any
@@ -11,9 +12,10 @@ from .po_record import PORecord
 
 class ValidationSeverity(Enum):
     """Severity levels for validation checks."""
-    ERROR = "ERROR"      # Critical error, blocks auto-update
+
+    ERROR = "ERROR"  # Critical error, blocks auto-update
     WARNING = "WARNING"  # Non-critical issue, flag for review
-    INFO = "INFO"        # Informational message
+    INFO = "INFO"  # Informational message
 
 
 @dataclass
@@ -29,6 +31,7 @@ class Validation:
         severity: Severity level (ERROR, WARNING, INFO)
         message: Detailed message explaining the result
     """
+
     check_name: str
     passed: bool
     expected: Any
@@ -56,6 +59,7 @@ class ValidationResult:
         warnings: List of warning messages
         pdf_path: Path to the source PDF file
     """
+
     invoice: Optional[Invoice]
     po_record: Optional[PORecord]
     validations: List[Validation] = field(default_factory=list)
@@ -64,6 +68,7 @@ class ValidationResult:
     errors: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     pdf_path: str = ""
+    nominal_code: str = ""
 
     def add_validation(self, validation: Validation) -> None:
         """Add a validation check result."""
@@ -94,12 +99,18 @@ class ValidationResult:
         if self.can_auto_update or self.po_record is None:
             return False
         # Reviewable if the only errors are store/match confidence issues
-        hard_errors = [v for v in self.validations
-                       if not v.passed and v.severity == ValidationSeverity.ERROR
-                       and v.check_name not in ("Store Match", "PO Match")]
+        hard_errors = [
+            v
+            for v in self.validations
+            if not v.passed
+            and v.severity == ValidationSeverity.ERROR
+            and v.check_name not in ("Store Match", "PO Match")
+        ]
         # Not reviewable if PO is already invoiced
-        has_duplicate = any(v.check_name == "Duplicate Invoice Check" and not v.passed
-                           for v in self.validations)
+        has_duplicate = any(
+            v.check_name == "Duplicate Invoice Check" and not v.passed
+            for v in self.validations
+        )
         return not hard_errors and not has_duplicate
 
     def get_status_summary(self) -> str:
@@ -114,7 +125,9 @@ class ValidationResult:
             return "UNKNOWN"
 
     @classmethod
-    def create_error(cls, pdf_path: str, error_message: str, invoice: Optional[Invoice] = None):
+    def create_error(
+        cls, pdf_path: str, error_message: str, invoice: Optional[Invoice] = None
+    ):
         """Create a validation result representing a critical error."""
         result = cls(
             invoice=invoice,
@@ -122,16 +135,18 @@ class ValidationResult:
             pdf_path=pdf_path,
             is_valid=False,
             can_auto_update=False,
-            errors=[error_message]
+            errors=[error_message],
         )
-        result.add_validation(Validation(
-            check_name="Critical Error",
-            passed=False,
-            expected=None,
-            actual=None,
-            severity=ValidationSeverity.ERROR,
-            message=error_message
-        ))
+        result.add_validation(
+            Validation(
+                check_name="Critical Error",
+                passed=False,
+                expected=None,
+                actual=None,
+                severity=ValidationSeverity.ERROR,
+                message=error_message,
+            )
+        )
         return result
 
     def __repr__(self) -> str:

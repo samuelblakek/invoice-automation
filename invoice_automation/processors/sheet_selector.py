@@ -1,6 +1,7 @@
 """
 Sheet selector for mapping suppliers to Excel sheets.
 """
+
 from typing import Optional
 
 
@@ -9,21 +10,21 @@ class SheetSelector:
 
     # Mapping of supplier types to sheet names
     SUPPLIER_SHEET_MAP = {
-        'AAW': 'AAW NATIONAL (PANDA)',
-        'CJL': 'CJL',
-        'APS': 'APS',
-        'AMAZON': 'ORDERS',
-        'COMPCO': 'OTHER',
-        'AURA': 'AURA AC',
-        'STORE_MAINTENANCE': 'STORE MAINTENANCE',
-        'OTHER': 'OTHER',
-        'GENERIC': 'OTHER',
+        "AAW": "AAW NATIONAL (PANDA)",
+        "CJL": "CJL",
+        "APS": "APS",
+        "AMAZON": "ORDERS",
+        "COMPCO": "OTHER",
+        "AURA": "AURA AC",
+        "STORE_MAINTENANCE": "STORE MAINTENANCE",
+        "OTHER": "OTHER",
+        "GENERIC": "OTHER",
         # New suppliers
-        'SUNBELT': 'OTHER',
-        'MAXWELL_JONES': 'OTHER',
-        'METRO_SECURITY': 'OTHER',
-        'ILUX': 'OTHER',
-        'LAMPSHOP': 'ORDERS',
+        "SUNBELT": "OTHER",
+        "MAXWELL_JONES": "OTHER",
+        "METRO_SECURITY": "OTHER",
+        "ILUX": "OTHER",
+        "LAMPSHOP": "ORDERS",
     }
 
     @staticmethod

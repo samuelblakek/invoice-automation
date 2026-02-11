@@ -1,6 +1,7 @@
 """
 Amount parsing utilities for handling currency values in invoices.
 """
+
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 import re
@@ -10,7 +11,7 @@ class AmountParser:
     """Utility class for parsing currency amounts."""
 
     # Pattern to match currency amounts with optional £ symbol
-    AMOUNT_PATTERN = r'[£$]?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)'
+    AMOUNT_PATTERN = r"[£$]?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)"
 
     @staticmethod
     def parse_amount(amount_str: str) -> Optional[Decimal]:
@@ -37,13 +38,13 @@ class AmountParser:
         amount_str = str(amount_str).strip()
 
         # Remove currency symbols and whitespace
-        amount_str = amount_str.replace('£', '').replace('$', '').strip()
+        amount_str = amount_str.replace("£", "").replace("$", "").strip()
 
         # Remove commas (thousand separators)
-        amount_str = amount_str.replace(',', '')
+        amount_str = amount_str.replace(",", "")
 
         # Try to extract amount using regex
-        match = re.search(r'(\d+(?:\.\d{1,2})?)', amount_str)
+        match = re.search(r"(\d+(?:\.\d{1,2})?)", amount_str)
         if match:
             try:
                 return Decimal(match.group(1))
@@ -57,7 +58,9 @@ class AmountParser:
             return None
 
     @staticmethod
-    def parse_vat(total: Optional[Decimal], net: Optional[Decimal]) -> Optional[Decimal]:
+    def parse_vat(
+        total: Optional[Decimal], net: Optional[Decimal]
+    ) -> Optional[Decimal]:
         """
         Calculate VAT from total and net amounts.
 
@@ -77,7 +80,9 @@ class AmountParser:
             return None
 
     @staticmethod
-    def calculate_vat(net: Optional[Decimal], vat_rate: Decimal = Decimal('0.20')) -> Optional[Decimal]:
+    def calculate_vat(
+        net: Optional[Decimal], vat_rate: Decimal = Decimal("0.20")
+    ) -> Optional[Decimal]:
         """
         Calculate VAT from net amount using a given rate.
 
@@ -97,7 +102,9 @@ class AmountParser:
             return None
 
     @staticmethod
-    def calculate_total(net: Optional[Decimal], vat: Optional[Decimal]) -> Optional[Decimal]:
+    def calculate_total(
+        net: Optional[Decimal], vat: Optional[Decimal]
+    ) -> Optional[Decimal]:
         """
         Calculate total from net and VAT amounts.
 
@@ -117,7 +124,9 @@ class AmountParser:
             return None
 
     @staticmethod
-    def is_valid_amount(amount: Optional[Decimal], min_value: Decimal = Decimal('0')) -> bool:
+    def is_valid_amount(
+        amount: Optional[Decimal], min_value: Decimal = Decimal("0")
+    ) -> bool:
         """
         Check if an amount is valid (non-negative by default).
 
@@ -137,7 +146,7 @@ class AmountParser:
             return False
 
     @staticmethod
-    def format_amount(amount: Optional[Decimal], currency_symbol: str = '£') -> str:
+    def format_amount(amount: Optional[Decimal], currency_symbol: str = "£") -> str:
         """
         Format an amount as a currency string.
 
@@ -154,8 +163,12 @@ class AmountParser:
         return f"{currency_symbol}{amount:.2f}"
 
     @staticmethod
-    def verify_vat_calculation(net: Optional[Decimal], vat: Optional[Decimal], total: Optional[Decimal],
-                                tolerance: Decimal = Decimal('0.02')) -> bool:
+    def verify_vat_calculation(
+        net: Optional[Decimal],
+        vat: Optional[Decimal],
+        total: Optional[Decimal],
+        tolerance: Decimal = Decimal("0.02"),
+    ) -> bool:
         """
         Verify that VAT calculation is correct: total = net + vat (within tolerance).
 

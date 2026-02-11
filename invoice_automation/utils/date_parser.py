@@ -1,6 +1,7 @@
 """
 Date parsing utilities for handling various date formats in invoices.
 """
+
 from datetime import datetime
 from typing import Optional
 import re
@@ -13,17 +14,20 @@ class DateParser:
     # Common date patterns found in invoices
     DATE_PATTERNS = [
         # DD Month YYYY (e.g., "08 May 2025", "3 April 2025")
-        (r'(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})', '%d %B %Y'),
-        (r'(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})', '%d %b %Y'),
-
+        (
+            r"(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})",
+            "%d %B %Y",
+        ),
+        (
+            r"(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})",
+            "%d %b %Y",
+        ),
         # DD/MM/YYYY or DD-MM-YYYY
-        (r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})', None),  # Will use dateutil
-
+        (r"(\d{1,2})[/-](\d{1,2})[/-](\d{4})", None),  # Will use dateutil
         # DD.MM.YY (e.g., "07.05.25")
-        (r'(\d{1,2})\.(\d{1,2})\.(\d{2})', '%d.%m.%y'),
-
+        (r"(\d{1,2})\.(\d{1,2})\.(\d{2})", "%d.%m.%y"),
         # YYYY-MM-DD (ISO format)
-        (r'(\d{4})-(\d{1,2})-(\d{1,2})', '%Y-%m-%d'),
+        (r"(\d{4})-(\d{1,2})-(\d{1,2})", "%Y-%m-%d"),
     ]
 
     @staticmethod
@@ -71,7 +75,7 @@ class DateParser:
             return None
 
     @staticmethod
-    def format_date(date: Optional[datetime], format_str: str = '%Y-%m-%d') -> str:
+    def format_date(date: Optional[datetime], format_str: str = "%Y-%m-%d") -> str:
         """
         Format a datetime object as a string.
 
@@ -92,7 +96,9 @@ class DateParser:
         return datetime.now()
 
     @staticmethod
-    def is_valid_date(date: Optional[datetime], min_year: int = 2020, max_year: int = 2030) -> bool:
+    def is_valid_date(
+        date: Optional[datetime], min_year: int = 2020, max_year: int = 2030
+    ) -> bool:
         """
         Check if a date is valid (within reasonable range).
 

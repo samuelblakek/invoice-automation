@@ -1,6 +1,7 @@
 """
 Excel writer for updating PO records while preserving formatting.
 """
+
 from pathlib import Path
 from datetime import datetime
 from decimal import Decimal
@@ -9,7 +10,9 @@ from openpyxl.styles import PatternFill
 from shutil import copy2
 
 # Light blue fill applied to rows updated by automation
-_UPDATED_ROW_FILL = PatternFill(start_color="DAEEF3", end_color="DAEEF3", fill_type="solid")
+_UPDATED_ROW_FILL = PatternFill(
+    start_color="DAEEF3", end_color="DAEEF3", fill_type="solid"
+)
 
 
 class ExcelWriter:
@@ -29,17 +32,22 @@ class ExcelWriter:
 
         # Create backup if requested
         if create_backup:
-            backup_path = self.workbook_path.with_suffix('.backup.xlsx')
+            backup_path = self.workbook_path.with_suffix(".backup.xlsx")
             copy2(self.workbook_path, backup_path)
             print(f"Created backup: {backup_path}")
 
         # Load workbook
         self.workbook = openpyxl.load_workbook(self.workbook_path)
 
-    def update_po_record(self, sheet_name: str, row_index: int,
-                        invoice_number: str, invoice_amount: Decimal,
-                        invoice_signed_date: datetime,
-                        nominal_code: str = "") -> bool:
+    def update_po_record(
+        self,
+        sheet_name: str,
+        row_index: int,
+        invoice_number: str,
+        invoice_amount: Decimal,
+        invoice_signed_date: datetime,
+        nominal_code: str = "",
+    ) -> bool:
         """
         Update a PO record with invoice details.
 
@@ -75,9 +83,11 @@ class ExcelWriter:
             excel_row = header_row + row_index + 1
 
             # Find column indices for the fields we need to update
-            col_invoice_no = self._find_column(ws, header_row, 'INVOICE NO.')
-            col_invoice_amount = self._find_column(ws, header_row, 'INVOICE AMOUNT (EX VAT)')
-            col_invoice_signed = self._find_column(ws, header_row, 'INVOICE SIGNED')
+            col_invoice_no = self._find_column(ws, header_row, "INVOICE NO.")
+            col_invoice_amount = self._find_column(
+                ws, header_row, "INVOICE AMOUNT (EX VAT)"
+            )
+            col_invoice_signed = self._find_column(ws, header_row, "INVOICE SIGNED")
 
             if not all([col_invoice_no, col_invoice_amount, col_invoice_signed]):
                 print(f"Error: Could not find required columns in sheet '{sheet_name}'")
@@ -85,15 +95,19 @@ class ExcelWriter:
 
             # Update the cells
             ws.cell(row=excel_row, column=col_invoice_no).value = invoice_number
-            ws.cell(row=excel_row, column=col_invoice_amount).value = float(invoice_amount)
-            ws.cell(row=excel_row, column=col_invoice_signed).value = invoice_signed_date
+            ws.cell(row=excel_row, column=col_invoice_amount).value = float(
+                invoice_amount
+            )
+            ws.cell(
+                row=excel_row, column=col_invoice_signed
+            ).value = invoice_signed_date
 
             # Write nominal code if provided and cell is currently empty
             if nominal_code:
-                col_nominal = self._find_column(ws, header_row, 'NOMINAL CODE')
+                col_nominal = self._find_column(ws, header_row, "NOMINAL CODE")
                 if col_nominal:
                     existing = ws.cell(row=excel_row, column=col_nominal).value
-                    if not existing or str(existing).strip() == '':
+                    if not existing or str(existing).strip() == "":
                         ws.cell(row=excel_row, column=col_nominal).value = nominal_code
 
             # Highlight the entire row light blue to mark it as processed
@@ -126,7 +140,7 @@ class ExcelWriter:
                     value_upper = cell.value.strip().upper()
                     # Require exact match for 'PO' to avoid matching titles
                     # like "Maintenance - PO's & Outstanding..."
-                    if value_upper == 'PO' or 'INVOICE NO' in value_upper:
+                    if value_upper == "PO" or "INVOICE NO" in value_upper:
                         return row_num
         return None
 

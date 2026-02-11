@@ -1,6 +1,7 @@
 """
 PO Record data model for representing Purchase Order records from Excel sheets.
 """
+
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -30,6 +31,7 @@ class PORecord:
         brand: Brand/store brand
         ticket_no: Ticket reference number
     """
+
     po_number: str
     sheet_name: str
     row_index: int

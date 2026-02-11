@@ -1,6 +1,7 @@
 """
 Report generator for invoice processing results.
 """
+
 from pathlib import Path
 from typing import List
 from datetime import datetime
@@ -42,7 +43,7 @@ class ReportGenerator:
             f"Flagged for Manual Review: {flagged}",
             f"Failed to Process: {failed}",
             "=" * 60,
-            ""
+            "",
         ]
 
         # List invoices by status
@@ -51,7 +52,9 @@ class ReportGenerator:
             for result in self.results:
                 if result.can_auto_update:
                     inv_num = result.invoice.invoice_number if result.invoice else "N/A"
-                    amount = f"£{result.invoice.net_amount:.2f}" if result.invoice else "N/A"
+                    amount = (
+                        f"£{result.invoice.net_amount:.2f}" if result.invoice else "N/A"
+                    )
                     supplier = result.invoice.supplier_name if result.invoice else "N/A"
                     summary.append(f"  ✓ {inv_num} - {supplier} - {amount}")
 
@@ -60,7 +63,9 @@ class ReportGenerator:
             for result in self.results:
                 if not result.can_auto_update:
                     inv_num = result.invoice.invoice_number if result.invoice else "N/A"
-                    supplier = result.invoice.supplier_name if result.invoice else "Unknown"
+                    supplier = (
+                        result.invoice.supplier_name if result.invoice else "Unknown"
+                    )
                     errors = ", ".join(result.errors[:2])  # First 2 errors
                     summary.append(f"  ✗ {inv_num} - {supplier} - {errors}")
 
@@ -75,9 +80,20 @@ class ReportGenerator:
         """
         import csv
 
-        with open(output_path, 'w', newline='') as f:
+        with open(output_path, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(['Status', 'Invoice Number', 'Supplier', 'PO Number', 'Store', 'Amount', 'Validations', 'Errors'])
+            writer.writerow(
+                [
+                    "Status",
+                    "Invoice Number",
+                    "Supplier",
+                    "PO Number",
+                    "Store",
+                    "Amount",
+                    "Validations",
+                    "Errors",
+                ]
+            )
 
             for result in self.results:
                 if result.invoice:
@@ -90,7 +106,18 @@ class ReportGenerator:
                     validations = f"{sum(1 for v in result.validations if v.passed)}/{len(result.validations)} passed"
                     errors = "; ".join(result.errors)
 
-                    writer.writerow([status, inv_num, supplier, po_num, store, amount, validations, errors])
+                    writer.writerow(
+                        [
+                            status,
+                            inv_num,
+                            supplier,
+                            po_num,
+                            store,
+                            amount,
+                            validations,
+                            errors,
+                        ]
+                    )
 
     def save_detailed_report(self, output_path: Path):
         """
@@ -100,12 +127,16 @@ class ReportGenerator:
             output_path: Path to save report file
         """
         lines = []
-        lines.append(f"Invoice Processing Report - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        lines.append(
+            f"Invoice Processing Report - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        )
         lines.append("=" * 80)
         lines.append("")
 
         for i, result in enumerate(self.results, 1):
-            lines.append(f"\n{i}. Invoice: {result.invoice.invoice_number if result.invoice else 'N/A'}")
+            lines.append(
+                f"\n{i}. Invoice: {result.invoice.invoice_number if result.invoice else 'N/A'}"
+            )
             lines.append("-" * 80)
 
             if result.invoice:
@@ -121,7 +152,9 @@ class ReportGenerator:
             lines.append("   Validations:")
             for validation in result.validations:
                 symbol = "✓" if validation.passed else "✗"
-                lines.append(f"      {symbol} {validation.check_name}: {validation.message}")
+                lines.append(
+                    f"      {symbol} {validation.check_name}: {validation.message}"
+                )
 
             if result.errors:
                 lines.append("\n   Errors:")
@@ -135,5 +168,5 @@ class ReportGenerator:
 
             lines.append("")
 
-        with open(output_path, 'w') as f:
-            f.write('\n'.join(lines))
+        with open(output_path, "w") as f:
+            f.write("\n".join(lines))

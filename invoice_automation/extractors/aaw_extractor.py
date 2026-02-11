@@ -1,8 +1,8 @@
 """
 AAW National invoice extractor.
 """
+
 from pathlib import Path
-from decimal import Decimal
 import re
 
 from .base_extractor import BaseExtractor, PDFExtractionError
@@ -40,7 +40,9 @@ class AAWExtractor(BaseExtractor):
         # Extract invoice number
         invoice_number = self._extract_invoice_number(text)
         if not invoice_number:
-            raise PDFExtractionError("Could not extract invoice number from AAW invoice")
+            raise PDFExtractionError(
+                "Could not extract invoice number from AAW invoice"
+            )
 
         # Extract PO number
         po_number = self._extract_po_number(text)
@@ -80,8 +82,8 @@ class AAWExtractor(BaseExtractor):
             raw_text=text,
             pdf_path=str(pdf_path),
             extracted_fields={
-                'works_completed': self._extract_works_completed(text),
-            }
+                "works_completed": self._extract_works_completed(text),
+            },
         )
 
         self._validate_required_fields(invoice)
@@ -91,7 +93,7 @@ class AAWExtractor(BaseExtractor):
     def _extract_invoice_number(self, text: str) -> str:
         """Extract invoice number."""
         # Pattern: "Invoice No 5002746" or "Invoice No: 5002746"
-        match = re.search(r'Invoice\s+No[:\s]+(\d+)', text, re.IGNORECASE)
+        match = re.search(r"Invoice\s+No[:\s]+(\d+)", text, re.IGNORECASE)
         if match:
             return match.group(1)
         return ""
@@ -99,12 +101,12 @@ class AAWExtractor(BaseExtractor):
     def _extract_po_number(self, text: str) -> str:
         """Extract PO/Order number."""
         # Pattern: "Order No PS0301111817" or "Order No: PS0301111817"
-        match = re.search(r'Order\s+No[:\s]+(PS\d{10,12})', text, re.IGNORECASE)
+        match = re.search(r"Order\s+No[:\s]+(PS\d{10,12})", text, re.IGNORECASE)
         if match:
             return match.group(1)
 
         # Fallback: look for PS followed by digits
-        match = re.search(r'(PS\d{10,12})', text)
+        match = re.search(r"(PS\d{10,12})", text)
         if match:
             return match.group(1)
 
@@ -113,7 +115,7 @@ class AAWExtractor(BaseExtractor):
     def _extract_invoice_date(self, text: str) -> any:
         """Extract invoice date."""
         # Pattern: "Date 08 May 2025" or "Customer Date 08 May 2025"
-        match = re.search(r'Date\s+(\d{1,2}\s+\w+\s+\d{4})', text, re.IGNORECASE)
+        match = re.search(r"Date\s+(\d{1,2}\s+\w+\s+\d{4})", text, re.IGNORECASE)
         if match:
             date_str = match.group(1)
             return self.date_parser.parse_date(date_str)
@@ -127,16 +129,20 @@ class AAWExtractor(BaseExtractor):
             Tuple of (store_location, store_address)
         """
         # Pattern: "Site\nMenkind Limited - Maidstone - Address"
-        match = re.search(r'Site\s*(.*?)(?:Works Description:|$)', text, re.IGNORECASE | re.DOTALL)
+        match = re.search(
+            r"Site\s*(.*?)(?:Works Description:|$)", text, re.IGNORECASE | re.DOTALL
+        )
         if match:
             site_text = match.group(1).strip()
 
             # Extract store name from pattern "Menkind Limited - StoreName - Address"
-            store_match = re.match(r'Menkind Limited\s*-\s*([^-]+)', site_text, re.IGNORECASE)
+            store_match = re.match(
+                r"Menkind Limited\s*-\s*([^-]+)", site_text, re.IGNORECASE
+            )
             if store_match:
                 store_location = store_match.group(1).strip()
                 # Clean up multi-line address
-                store_address = ' '.join(site_text.split())
+                store_address = " ".join(site_text.split())
                 return store_location, store_address
 
         return "", ""
@@ -154,19 +160,19 @@ class AAWExtractor(BaseExtractor):
 
         # Extract Total (net before VAT)
         # Pattern: "Total £ 116.50" or "Total £116.50"
-        match = re.search(r'Total\s+£\s*([\d,]+\.?\d*)', text)
+        match = re.search(r"Total\s+£\s*([\d,]+\.?\d*)", text)
         if match:
             net_amount = self.amount_parser.parse_amount(match.group(1))
 
         # Extract VAT
         # Pattern: "VAT @ 20.00% £ 23.30"
-        match = re.search(r'VAT[^£]*£\s*([\d,]+\.?\d*)', text)
+        match = re.search(r"VAT[^£]*£\s*([\d,]+\.?\d*)", text)
         if match:
             vat_amount = self.amount_parser.parse_amount(match.group(1))
 
         # Extract total with VAT
         # Pattern: "This Invoice £ 139.80"
-        match = re.search(r'This Invoice\s+£\s*([\d,]+\.?\d*)', text)
+        match = re.search(r"This Invoice\s+£\s*([\d,]+\.?\d*)", text)
         if match:
             total_amount = self.amount_parser.parse_amount(match.group(1))
 
@@ -183,18 +189,22 @@ class AAWExtractor(BaseExtractor):
     def _extract_description(self, text: str) -> str:
         """Extract works description."""
         # Pattern: "Works Description:\n<description>\nWorks Completed:"
-        match = re.search(r'Works Description:(.*?)Works Completed:', text, re.IGNORECASE | re.DOTALL)
+        match = re.search(
+            r"Works Description:(.*?)Works Completed:", text, re.IGNORECASE | re.DOTALL
+        )
         if match:
             description = match.group(1).strip()
             # Clean up multi-line description
-            description = ' '.join(description.split())
+            description = " ".join(description.split())
             return description[:500]  # Limit length
         return ""
 
     def _extract_works_completed(self, text: str) -> any:
         """Extract works completed date."""
         # Pattern: "Works Completed: 07 May 2025"
-        match = re.search(r'Works Completed:\s*(\d{1,2}\s+\w+\s+\d{4})', text, re.IGNORECASE)
+        match = re.search(
+            r"Works Completed:\s*(\d{1,2}\s+\w+\s+\d{4})", text, re.IGNORECASE
+        )
         if match:
             date_str = match.group(1)
             return self.date_parser.parse_date(date_str)

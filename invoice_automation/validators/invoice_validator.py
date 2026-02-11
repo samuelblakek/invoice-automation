@@ -1,6 +1,7 @@
 """
 Invoice validator orchestrator - coordinates all validation checks.
 """
+
 from decimal import Decimal
 
 from ..models import Invoice, ValidationResult, Validation, ValidationSeverity
@@ -12,7 +13,9 @@ from .quote_validator import QuoteValidator
 class InvoiceValidator:
     """Main validator that orchestrates all validation checks."""
 
-    def __init__(self, excel_reader: ExcelReader, quote_threshold: Decimal = Decimal('200.00')):
+    def __init__(
+        self, excel_reader: ExcelReader, quote_threshold: Decimal = Decimal("200.00")
+    ):
         """
         Initialize invoice validator.
 
@@ -46,9 +49,7 @@ class InvoiceValidator:
             ValidationResult with all checks performed
         """
         result = ValidationResult(
-            invoice=invoice,
-            po_record=None,
-            pdf_path=invoice.pdf_path
+            invoice=invoice, po_record=None, pdf_path=invoice.pdf_path
         )
 
         # Step 1: Find PO record
@@ -90,17 +91,17 @@ class InvoiceValidator:
                 expected="Positive amount",
                 actual=f"£{invoice.net_amount}",
                 severity=ValidationSeverity.ERROR,
-                message=f"Extracted net amount is £{invoice.net_amount} which is invalid. Check the PDF — the amount may not have been read correctly."
+                message=f"Extracted net amount is £{invoice.net_amount} which is invalid. Check the PDF — the amount may not have been read correctly.",
             )
 
-        if invoice.net_amount > Decimal('10000'):
+        if invoice.net_amount > Decimal("10000"):
             return Validation(
                 check_name="Amount Validation",
                 passed=True,
                 expected="Amount under £10,000",
                 actual=f"£{invoice.net_amount}",
                 severity=ValidationSeverity.WARNING,
-                message=f"High amount: £{invoice.net_amount} (exceeds £10,000 - please verify)"
+                message=f"High amount: £{invoice.net_amount} (exceeds £10,000 - please verify)",
             )
 
         return Validation(
@@ -109,6 +110,5 @@ class InvoiceValidator:
             expected="Valid amount",
             actual=f"£{invoice.net_amount}",
             severity=ValidationSeverity.INFO,
-            message=f"Amount validated: £{invoice.net_amount}"
+            message=f"Amount validated: £{invoice.net_amount}",
         )
-

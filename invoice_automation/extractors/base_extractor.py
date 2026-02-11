@@ -1,12 +1,12 @@
 """
 Base extractor class for PDF invoice extraction.
 """
+
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional, Dict
 import re
 import pdfplumber
-from functools import lru_cache
 
 from ..models import Invoice
 from ..utils import DateParser, AmountParser, StringMatcher
@@ -14,6 +14,7 @@ from ..utils import DateParser, AmountParser, StringMatcher
 
 class PDFExtractionError(Exception):
     """Exception raised when PDF extraction fails."""
+
     pass
 
 
@@ -86,9 +87,11 @@ class BaseExtractor(ABC):
                     page_text = page.extract_text()
                     if page_text:
                         text_parts.append(page_text)
-                return '\n'.join(text_parts)
+                return "\n".join(text_parts)
         except Exception as e:
-            raise PDFExtractionError(f"Failed to extract text from {pdf_path}: {str(e)}")
+            raise PDFExtractionError(
+                f"Failed to extract text from {pdf_path}: {str(e)}"
+            )
 
     def _extract_first_page_text(self, pdf_path: Path) -> str:
         """
@@ -109,7 +112,9 @@ class BaseExtractor(ABC):
                     return pdf.pages[0].extract_text() or ""
                 return ""
         except Exception as e:
-            raise PDFExtractionError(f"Failed to extract first page from {pdf_path}: {str(e)}")
+            raise PDFExtractionError(
+                f"Failed to extract first page from {pdf_path}: {str(e)}"
+            )
 
     def _find_pattern(self, text: str, pattern: str, flags: int = 0) -> Optional[str]:
         """
@@ -145,7 +150,9 @@ class BaseExtractor(ABC):
         matches = compiled.findall(text)
         return matches if matches else []
 
-    def _extract_field_value(self, text: str, field_name: str, pattern: Optional[str] = None) -> Optional[str]:
+    def _extract_field_value(
+        self, text: str, field_name: str, pattern: Optional[str] = None
+    ) -> Optional[str]:
         """
         Extract a field value that follows a field name/label.
 
@@ -160,10 +167,10 @@ class BaseExtractor(ABC):
             Extracted value, or None if not found
         """
         if pattern is None:
-            pattern = r'([^\n]+)'
+            pattern = r"([^\n]+)"
 
         # Build regex pattern: field_name followed by optional separator and value
-        full_pattern = rf'{re.escape(field_name)}\s*[:=]?\s*{pattern}'
+        full_pattern = rf"{re.escape(field_name)}\s*[:=]?\s*{pattern}"
 
         compiled = self._get_compiled_pattern(full_pattern, re.IGNORECASE)
         match = compiled.search(text)
@@ -185,7 +192,7 @@ class BaseExtractor(ABC):
             return ""
 
         # Remove extra whitespace and newlines
-        text = ' '.join(text.split())
+        text = " ".join(text.split())
         return text.strip()
 
     def _validate_required_fields(self, invoice: Invoice) -> None:
@@ -199,12 +206,13 @@ class BaseExtractor(ABC):
             PDFExtractionError: If required fields are missing
         """
         required_fields = {
-            'invoice_number': invoice.invoice_number,
-            'net_amount': invoice.net_amount,
+            "invoice_number": invoice.invoice_number,
+            "net_amount": invoice.net_amount,
         }
 
         missing_fields = [
-            field_name for field_name, value in required_fields.items()
+            field_name
+            for field_name, value in required_fields.items()
             if not value or (isinstance(value, str) and not value.strip())
         ]
 

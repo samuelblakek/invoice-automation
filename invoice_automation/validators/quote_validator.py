@@ -1,6 +1,7 @@
 """
 Quote authorization validator for £200+ invoices.
 """
+
 from decimal import Decimal
 
 from ..models import Invoice, PORecord, Validation, ValidationSeverity
@@ -9,7 +10,7 @@ from ..models import Invoice, PORecord, Validation, ValidationSeverity
 class QuoteValidator:
     """Validator for quote authorization on invoices over £200."""
 
-    def __init__(self, threshold: Decimal = Decimal('200.00')):
+    def __init__(self, threshold: Decimal = Decimal("200.00")):
         """
         Initialize quote validator.
 
@@ -45,12 +46,16 @@ class QuoteValidator:
                 expected="No authorization required",
                 actual=f"Amount £{invoice.net_amount:.2f} ≤ £{self.threshold:.2f}",
                 severity=ValidationSeverity.INFO,
-                message=f"Invoice amount £{invoice.net_amount:.2f} is below £{self.threshold:.2f} threshold - no quote authorization required"
+                message=f"Invoice amount £{invoice.net_amount:.2f} is below £{self.threshold:.2f} threshold - no quote authorization required",
             )
 
         # Amount is over threshold - check authorization
-        has_quote_ref = bool(po_record.quote_over_200 and str(po_record.quote_over_200).strip())
-        has_authorization = bool(po_record.authorized and str(po_record.authorized).strip())
+        has_quote_ref = bool(
+            po_record.quote_over_200 and str(po_record.quote_over_200).strip()
+        )
+        has_authorization = bool(
+            po_record.authorized and str(po_record.authorized).strip()
+        )
 
         # Case 1: Has quote reference AND authorization → PASS
         if has_quote_ref and has_authorization:
@@ -60,7 +65,7 @@ class QuoteValidator:
                 expected="Quote reference and authorization present",
                 actual=f"Quote: {po_record.quote_over_200}, Auth: {po_record.authorized}",
                 severity=ValidationSeverity.INFO,
-                message=f"Quote authorized: Quote ref '{po_record.quote_over_200}', Authorized by '{po_record.authorized}'"
+                message=f"Quote authorized: Quote ref '{po_record.quote_over_200}', Authorized by '{po_record.authorized}'",
             )
 
         sheet = po_record.sheet_name
@@ -74,7 +79,7 @@ class QuoteValidator:
                 expected="Quote reference AND authorization",
                 actual=f"Quote: {po_record.quote_over_200}, Auth: MISSING",
                 severity=ValidationSeverity.WARNING,
-                message=f"Over £200 — quote '{po_record.quote_over_200}' present but 'AUTHORISED' is empty (sheet '{sheet}', row {row})"
+                message=f"Over £200 — quote '{po_record.quote_over_200}' present but 'AUTHORISED' is empty (sheet '{sheet}', row {row})",
             )
 
         # Case 3: No quote reference at all → WARN
@@ -85,7 +90,7 @@ class QuoteValidator:
                 expected="Quote reference and authorization",
                 actual="No quote reference found",
                 severity=ValidationSeverity.WARNING,
-                message=f"Over £200 — 'QUOTE OVER £200' and 'AUTHORISED' are both empty (sheet '{sheet}', row {row})"
+                message=f"Over £200 — 'QUOTE OVER £200' and 'AUTHORISED' are both empty (sheet '{sheet}', row {row})",
             )
 
         # Case 4: Has authorization but no quote reference → WARN
@@ -95,5 +100,5 @@ class QuoteValidator:
             expected="Quote reference and authorization",
             actual=f"No quote ref, Auth: {po_record.authorized}",
             severity=ValidationSeverity.WARNING,
-            message=f"Over £200 — authorized by '{po_record.authorized}' but 'QUOTE OVER £200' is empty (sheet '{sheet}', row {row})"
+            message=f"Over £200 — authorized by '{po_record.authorized}' but 'QUOTE OVER £200' is empty (sheet '{sheet}', row {row})",
         )

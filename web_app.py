@@ -2,18 +2,26 @@
 Invoice Automation - Web Interface
 Simple drag-and-drop interface for invoice processing
 """
+
+import base64
 import json
-import streamlit as st
 import tempfile
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
+import streamlit as st
 
 from invoice_automation.processors import ExcelReader, ExcelWriter
 from invoice_automation.validators import InvoiceValidator
 from invoice_automation.extractors import (
-    AAWExtractor, CJLExtractor, AmazonExtractor, APSExtractor, GenericExtractor, PDFExtractionError
+    AAWExtractor,
+    CJLExtractor,
+    AmazonExtractor,
+    APSExtractor,
+    GenericExtractor,
 )
 from invoice_automation.models import ValidationResult
+from invoice_automation.utils.supplier_registry import identify_supplier as identify_supplier_from_text
 from invoice_automation.reports.report_generator import ReportGenerator
 import pdfplumber
 
@@ -279,20 +287,24 @@ button[kind="secondary"]:hover {
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def inv_card_html(inv, po=None, extra="", accent="var(--border-subtle)"):
     """Generate HTML for an invoice card."""
-    po_line = f'<div class="inv-detail">PO: {po.po_number}  |  {po.store}</div>' if po else ""
-    return f'''<div class="inv-card" style="--card-accent:{accent}">
+    po_line = (
+        f'<div class="inv-detail">PO: {po.po_number}  |  {po.store}</div>' if po else ""
+    )
+    return f"""<div class="inv-card" style="--card-accent:{accent}">
         <div class="inv-num">{inv.invoice_number}</div>
         <div class="inv-supplier">{inv.supplier_name}</div>
         <div class="inv-amount">&pound;{inv.net_amount:.2f}</div>
         <div class="inv-detail">Store: {inv.store_location}</div>
         {po_line}{extra}
-    </div>'''
+    </div>"""
 
 
-def lookup_nominal_code(supplier_name: str, rows: list[dict],
-                        invoice_text: str = "") -> str:
+def lookup_nominal_code(
+    supplier_name: str, rows: list[dict], invoice_text: str = ""
+) -> str:
     """Find nominal code for supplier, using invoice text to disambiguate
     when a supplier has multiple codes for different work types.
 
@@ -397,52 +409,28 @@ def save_nominal_codes_to_disk(rows: list[dict]):
 
 
 def identify_supplier(pdf_path: Path, first_page_text: str) -> str:
-    """Identify supplier from filename or PDF content."""
-    filename_lower = pdf_path.name.lower()
-    text_lower = first_page_text.lower()
-
-    if 'aaw' in filename_lower or 'aaw national' in text_lower:
-        return 'AAW'
-    elif 'cjl' in filename_lower or 'cjl group' in text_lower:
-        return 'CJL'
-    elif 'amazon' in filename_lower or 'amazon business' in text_lower:
-        return 'AMAZON'
-    elif 'aps' in filename_lower or 'automatic protection' in text_lower:
-        return 'APS'
-    elif 'compco' in filename_lower or 'compco fire' in text_lower:
-        return 'COMPCO'
-    elif 'sunbelt' in text_lower or 'sunbelt' in filename_lower:
-        return 'SUNBELT'
-    elif 'maxwell jones' in text_lower or 'maxwelljones' in text_lower:
-        return 'MAXWELL_JONES'
-    elif 'metro security' in text_lower:
-        return 'METRO_SECURITY'
-    elif 'store maintenance' in text_lower or 'reactive on call' in text_lower:
-        return 'STORE_MAINTENANCE'
-    elif 'lampshoponline' in text_lower or 'lampshop' in text_lower:
-        return 'LAMPSHOP'
-    elif 'ilux' in text_lower:
-        return 'ILUX'
-    else:
-        return 'GENERIC'
+    """Identify supplier type from filename or PDF content for extractor routing."""
+    _, supplier_type = identify_supplier_from_text(first_page_text, pdf_path.name)
+    return supplier_type
 
 
 @st.cache_resource
 def get_extractors():
     """Get cached extractor instances."""
     return {
-        'AAW': AAWExtractor(),
-        'CJL': CJLExtractor(),
-        'AMAZON': AmazonExtractor(),
-        'APS': APSExtractor(),
-        'COMPCO': GenericExtractor(),
-        'GENERIC': GenericExtractor(),
-        'SUNBELT': GenericExtractor(),
-        'MAXWELL_JONES': GenericExtractor(),
-        'METRO_SECURITY': GenericExtractor(),
-        'STORE_MAINTENANCE': GenericExtractor(),
-        'LAMPSHOP': GenericExtractor(),
-        'ILUX': GenericExtractor(),
+        "AAW": AAWExtractor(),
+        "CJL": CJLExtractor(),
+        "AMAZON": AmazonExtractor(),
+        "APS": APSExtractor(),
+        "COMPCO": GenericExtractor(),
+        "GENERIC": GenericExtractor(),
+        "SUNBELT": GenericExtractor(),
+        "MAXWELL_JONES": GenericExtractor(),
+        "METRO_SECURITY": GenericExtractor(),
+        "STORE_MAINTENANCE": GenericExtractor(),
+        "LAMPSHOP": GenericExtractor(),
+        "ILUX": GenericExtractor(),
+        "AURA": GenericExtractor(),
     }
 
 
@@ -453,18 +441,14 @@ def extract_invoice(pdf_path: Path):
 
     supplier_type = identify_supplier(pdf_path, first_page_text)
     extractors = get_extractors()
-    extractor = extractors.get(supplier_type, extractors['GENERIC'])
+    extractor = extractors.get(supplier_type, extractors["GENERIC"])
     return extractor.extract(pdf_path)
 
 
 # ---------------------------------------------------------------------------
 # Page config + CSS injection
 # ---------------------------------------------------------------------------
-st.set_page_config(
-    page_title="Invoice Automation",
-    page_icon="📄",
-    layout="wide"
-)
+st.set_page_config(page_title="Invoice Automation", page_icon="📄", layout="wide")
 
 st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
 
@@ -477,43 +461,43 @@ with st.sidebar:
 
     # Counter used to generate unique widget keys -- incrementing it forces
     # Streamlit to recreate the file uploaders, clearing uploaded files.
-    upload_gen = st.session_state.get('upload_gen', 0)
+    upload_gen = st.session_state.get("upload_gen", 0)
 
     invoice_pdfs = st.file_uploader(
         "Invoice PDFs",
-        type=['pdf'],
+        type=["pdf"],
         accept_multiple_files=True,
         help="Upload all invoice PDFs you want to process",
-        key=f"pdf_uploader_{upload_gen}"
+        key=f"pdf_uploader_{upload_gen}",
     )
 
     maintenance_po = st.file_uploader(
         "Maintenance PO Spreadsheet",
-        type=['xlsx'],
+        type=["xlsx"],
         help="Your Maintenance PO's Excel file",
-        key=f"maintenance_uploader_{upload_gen}"
+        key=f"maintenance_uploader_{upload_gen}",
     )
 
     # --- Nominal code mapping (always visible, backed by JSON file) ---
-    if 'nominal_mapping_rows' not in st.session_state:
-        st.session_state['nominal_mapping_rows'] = load_nominal_codes_from_disk()
+    if "nominal_mapping_rows" not in st.session_state:
+        st.session_state["nominal_mapping_rows"] = load_nominal_codes_from_disk()
 
-    nom_gen = st.session_state.get('nom_input_gen', 0)
+    nom_gen = st.session_state.get("nom_input_gen", 0)
 
     with st.expander("Supplier Nominal Codes"):
         # Show feedback from previous action
-        nom_msg = st.session_state.pop('nom_feedback', None)
+        nom_msg = st.session_state.pop("nom_feedback", None)
         if nom_msg:
             st.success(nom_msg)
 
-        rows = st.session_state['nominal_mapping_rows']
-        scroll_to_bottom = st.session_state.pop('nom_scroll_bottom', False)
+        rows = st.session_state["nominal_mapping_rows"]
+        scroll_to_bottom = st.session_state.pop("nom_scroll_bottom", False)
         if rows:
             list_html = "".join(
                 f'<div style="padding:0.3rem 0;border-bottom:1px solid var(--border-subtle)">'
                 f'<div style="color:var(--text-primary);font-size:0.82rem">{r["Supplier"]}</div>'
                 f'<div style="color:var(--text-muted);font-size:0.75rem">{r["Nominal Code"]}</div>'
-                f'</div>'
+                f"</div>"
                 for r in rows
             )
             scroll_js = ""
@@ -521,42 +505,57 @@ with st.sidebar:
                 scroll_js = '<script>var el=document.getElementById("nom-list");if(el)el.scrollTop=el.scrollHeight;</script>'
             st.markdown(
                 f'<div id="nom-list" style="max-height:260px;overflow-y:auto;border:1px solid var(--border-medium);border-radius:6px;padding:0.4rem 0.6rem;margin-bottom:0.75rem">{list_html}</div>{scroll_js}',
-                unsafe_allow_html=True
+                unsafe_allow_html=True,
             )
         else:
             st.caption("No mappings configured")
 
         # Add new entry
-        new_supplier = st.text_input("Supplier", key=f"new_nom_supplier_{nom_gen}",
-                                     placeholder="e.g. Lamp Shop Online")
-        new_code = st.text_input("Nominal Code", key=f"new_nom_code_{nom_gen}",
-                                 placeholder="e.g. 7820 Stores Repairs")
-        if st.button("Add", use_container_width=True, key="add_nominal",
-                      disabled=not (new_supplier and new_code)):
+        new_supplier = st.text_input(
+            "Supplier",
+            key=f"new_nom_supplier_{nom_gen}",
+            placeholder="e.g. Lamp Shop Online",
+        )
+        new_code = st.text_input(
+            "Nominal Code",
+            key=f"new_nom_code_{nom_gen}",
+            placeholder="e.g. 7820 Stores Repairs",
+        )
+        if st.button(
+            "Add",
+            use_container_width=True,
+            key="add_nominal",
+            disabled=not (new_supplier and new_code),
+        ):
             added_name = new_supplier.strip()
-            st.session_state['nominal_mapping_rows'].append(
+            st.session_state["nominal_mapping_rows"].append(
                 {"Supplier": added_name, "Nominal Code": new_code.strip()}
             )
-            save_nominal_codes_to_disk(st.session_state['nominal_mapping_rows'])
-            st.session_state['nom_input_gen'] = nom_gen + 1
-            st.session_state['nom_feedback'] = f"Added {added_name}"
-            st.session_state['nom_scroll_bottom'] = True
+            save_nominal_codes_to_disk(st.session_state["nominal_mapping_rows"])
+            st.session_state["nom_input_gen"] = nom_gen + 1
+            st.session_state["nom_feedback"] = f"Added {added_name}"
+            st.session_state["nom_scroll_bottom"] = True
             st.rerun()
 
         # Delete entry
         if rows:
             del_options = [r["Supplier"] for r in rows]
-            del_choice = st.selectbox("Remove supplier", del_options,
-                                      index=None, placeholder="Select to remove...",
-                                      key=f"del_nominal_select_{nom_gen}")
-            if del_choice and st.button("Remove", use_container_width=True,
-                                         key="del_nominal"):
-                st.session_state['nominal_mapping_rows'] = [
+            del_choice = st.selectbox(
+                "Remove supplier",
+                del_options,
+                index=None,
+                placeholder="Select to remove...",
+                key=f"del_nominal_select_{nom_gen}",
+            )
+            if del_choice and st.button(
+                "Remove", use_container_width=True, key="del_nominal"
+            ):
+                st.session_state["nominal_mapping_rows"] = [
                     r for r in rows if r["Supplier"] != del_choice
                 ]
-                save_nominal_codes_to_disk(st.session_state['nominal_mapping_rows'])
-                st.session_state['nom_input_gen'] = nom_gen + 1
-                st.session_state['nom_feedback'] = f"Removed {del_choice}"
+                save_nominal_codes_to_disk(st.session_state["nominal_mapping_rows"])
+                st.session_state["nom_input_gen"] = nom_gen + 1
+                st.session_state["nom_feedback"] = f"Removed {del_choice}"
                 st.rerun()
 
     st.markdown("")
@@ -565,7 +564,7 @@ with st.sidebar:
         "Process Invoices",
         type="primary",
         disabled=not all_files_uploaded,
-        use_container_width=True
+        use_container_width=True,
     )
 
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
@@ -615,17 +614,16 @@ nominal codes, and updates the Maintenance PO spreadsheet automatically.
 
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
     if st.button("Reset App", key="reset_app", use_container_width=True):
-        next_gen = st.session_state.get('upload_gen', 0) + 1
+        next_gen = st.session_state.get("upload_gen", 0) + 1
         st.session_state.clear()
-        st.session_state['upload_gen'] = next_gen
-        st.session_state['nominal_mapping_rows'] = load_nominal_codes_from_disk()
+        st.session_state["upload_gen"] = next_gen
+        st.session_state["nominal_mapping_rows"] = load_nominal_codes_from_disk()
         st.rerun()
 
 
 # ---------------------------------------------------------------------------
 # Main content
 # ---------------------------------------------------------------------------
-import base64
 _logo_path = Path(__file__).parent / "assets" / "menkind-logo.jpg"
 if _logo_path.exists():
     _logo_b64 = base64.b64encode(_logo_path.read_bytes()).decode()
@@ -633,17 +631,19 @@ if _logo_path.exists():
         f'<div style="display:flex;flex-direction:column;align-items:flex-start;gap:0.5rem;margin-bottom:0.25rem">'
         f'<img src="data:image/jpeg;base64,{_logo_b64}" '
         f'style="width:52px;height:52px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.3)" />'
-        f'</div>',
-        unsafe_allow_html=True
+        f"</div>",
+        unsafe_allow_html=True,
     )
 st.markdown("## Menkind Maintenance PO Processing")
 
 # Empty state -- no files uploaded
-if not all_files_uploaded and not st.session_state.get('processed'):
+if not all_files_uploaded and not st.session_state.get("processed"):
     st.markdown("Upload files in the sidebar to get started.")
 
 # Files uploaded but not yet processed
-elif all_files_uploaded and not st.session_state.get('processed') and not process_button:
+elif (
+    all_files_uploaded and not st.session_state.get("processed") and not process_button
+):
     st.markdown("Files uploaded. Click **Process Invoices** in the sidebar.")
 
 # ---------------------------------------------------------------------------
@@ -695,15 +695,16 @@ if process_button and all_files_uploaded:
             status_text.empty()
 
             # Look up nominal codes and warn on misses
-            nominal_rows = st.session_state.get('nominal_mapping_rows', [])
+            nominal_rows = st.session_state.get("nominal_mapping_rows", [])
             for result in results:
                 if result.invoice:
                     inv = result.invoice
                     nom_code = lookup_nominal_code(
-                        inv.supplier_name, nominal_rows,
-                        invoice_text=f"{inv.description} {inv.raw_text}"
+                        inv.supplier_name,
+                        nominal_rows,
+                        invoice_text=f"{inv.description} {inv.raw_text}",
                     )
-                    result._nominal_code = nom_code
+                    result.nominal_code = nom_code
                     if not nom_code:
                         result.warnings.append(
                             f"No nominal code mapping for '{inv.supplier_name}'"
@@ -713,18 +714,18 @@ if process_button and all_files_uploaded:
             with ExcelWriter(maintenance_path, create_backup=False) as writer:
                 for result in results:
                     if result.can_auto_update:
-                        nom_code = getattr(result, '_nominal_code', '')
+                        nom_code = result.nominal_code
                         writer.update_po_record(
                             result.po_record.sheet_name,
                             result.po_record.row_index,
                             result.invoice.invoice_number,
                             result.invoice.net_amount,
                             datetime.now(),
-                            nominal_code=nom_code
+                            nominal_code=nom_code,
                         )
 
             # Read updated Excel into memory (auto-updates applied)
-            with open(maintenance_path, 'rb') as f:
+            with open(maintenance_path, "rb") as f:
                 updated_excel_bytes = f.read()
 
             # Generate reports
@@ -740,34 +741,38 @@ if process_button and all_files_uploaded:
             report_content = temp_report.read_text()
 
             # Store in session state
-            st.session_state['results'] = results
-            st.session_state['updated_excel_bytes'] = updated_excel_bytes
-            st.session_state['csv_content'] = csv_content
-            st.session_state['report_content'] = report_content
-            st.session_state['processed'] = True
+            st.session_state["results"] = results
+            st.session_state["updated_excel_bytes"] = updated_excel_bytes
+            st.session_state["csv_content"] = csv_content
+            st.session_state["report_content"] = report_content
+            st.session_state["processed"] = True
             # Track review decisions: {index: "confirmed" | "skipped" | None}
             review_results = [r for r in results if r.needs_review]
-            st.session_state['review_decisions'] = {i: None for i in range(len(review_results))}
+            st.session_state["review_decisions"] = {
+                i: None for i in range(len(review_results))
+            }
 
 
 # ---------------------------------------------------------------------------
 # Results -- three-column board layout
 # ---------------------------------------------------------------------------
-if st.session_state.get('processed'):
-    results = st.session_state['results']
+if st.session_state.get("processed"):
+    results = st.session_state["results"]
 
     # Split into 3 buckets
     auto_results = [r for r in results if r.can_auto_update]
     review_results = [r for r in results if r.needs_review]
-    failed_results = [r for r in results if not r.can_auto_update and not r.needs_review]
+    failed_results = [
+        r for r in results if not r.can_auto_update and not r.needs_review
+    ]
 
     # Inline metrics
-    metrics_html = f'''<div class="inline-metrics">
+    metrics_html = f"""<div class="inline-metrics">
         <div class="inline-metric"><strong>{len(results)}</strong> total</div>
         <div class="inline-metric"><strong>{len(auto_results)}</strong> matched</div>
         <div class="inline-metric"><strong>{len(review_results)}</strong> review</div>
         <div class="inline-metric"><strong>{len(failed_results)}</strong> failed</div>
-    </div>'''
+    </div>"""
     st.markdown(metrics_html, unsafe_allow_html=True)
 
     # Three-column board
@@ -775,15 +780,26 @@ if st.session_state.get('processed'):
 
     # --- Matched column ---
     with col_match:
-        st.markdown(f'<div class="col-header col-header-green">Matched ({len(auto_results)})</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="col-header col-header-green">Matched ({len(auto_results)})</div>',
+            unsafe_allow_html=True,
+        )
         for r in auto_results:
-            warn_html = "".join(f'<div class="inv-warning">⚠ {w}</div>' for w in r.warnings)
-            st.markdown(inv_card_html(r.invoice, r.po_record, warn_html, accent="var(--green)"), unsafe_allow_html=True)
+            warn_html = "".join(
+                f'<div class="inv-warning">⚠ {w}</div>' for w in r.warnings
+            )
+            st.markdown(
+                inv_card_html(r.invoice, r.po_record, warn_html, accent="var(--green)"),
+                unsafe_allow_html=True,
+            )
 
     # --- Review column ---
     with col_review:
-        st.markdown(f'<div class="col-header col-header-amber">Needs Review ({len(review_results)})</div>', unsafe_allow_html=True)
-        review_decisions = st.session_state.get('review_decisions', {})
+        st.markdown(
+            f'<div class="col-header col-header-amber">Needs Review ({len(review_results)})</div>',
+            unsafe_allow_html=True,
+        )
+        review_decisions = st.session_state.get("review_decisions", {})
 
         for idx, result in enumerate(review_results):
             inv = result.invoice
@@ -806,55 +822,87 @@ if st.session_state.get('processed'):
                     st.caption(f"PO: {po.po_number}  |  {po.store}")
 
                 for error in result.errors:
-                    st.markdown(f"<span style='color:var(--amber);font-size:0.78rem'>⚠ {error}</span>", unsafe_allow_html=True)
+                    st.markdown(
+                        f"<span style='color:var(--amber);font-size:0.78rem'>⚠ {error}</span>",
+                        unsafe_allow_html=True,
+                    )
                 for warning in result.warnings:
-                    st.markdown(f"<span style='color:var(--amber);font-size:0.78rem'>⚠ {warning}</span>", unsafe_allow_html=True)
+                    st.markdown(
+                        f"<span style='color:var(--amber);font-size:0.78rem'>⚠ {warning}</span>",
+                        unsafe_allow_html=True,
+                    )
 
                 bc1, bc2 = st.columns(2)
                 with bc1:
-                    if st.button("Confirm Update", key=f"confirm_{idx}", type="primary",
-                                 use_container_width=True):
-                        st.session_state['review_decisions'][idx] = "confirmed"
+                    if st.button(
+                        "Confirm Update",
+                        key=f"confirm_{idx}",
+                        type="primary",
+                        use_container_width=True,
+                    ):
+                        st.session_state["review_decisions"][idx] = "confirmed"
                         st.rerun()
                 with bc2:
                     if st.button("Skip", key=f"skip_{idx}", use_container_width=True):
-                        st.session_state['review_decisions'][idx] = "skipped"
+                        st.session_state["review_decisions"][idx] = "skipped"
                         st.rerun()
 
     # --- Failed column ---
     with col_fail:
-        st.markdown(f'<div class="col-header col-header-red">Failed ({len(failed_results)})</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="col-header col-header-red">Failed ({len(failed_results)})</div>',
+            unsafe_allow_html=True,
+        )
         for result in failed_results:
-            err_html = "".join(f'<div class="inv-error">{e}</div>' for e in result.errors)
+            err_html = "".join(
+                f'<div class="inv-error">{e}</div>' for e in result.errors
+            )
             if result.invoice:
-                st.markdown(inv_card_html(result.invoice, result.po_record, err_html, accent="var(--red)"), unsafe_allow_html=True)
+                st.markdown(
+                    inv_card_html(
+                        result.invoice, result.po_record, err_html, accent="var(--red)"
+                    ),
+                    unsafe_allow_html=True,
+                )
             else:
-                st.markdown(f'''<div class="inv-card" style="--card-accent:var(--red)">
+                st.markdown(
+                    f"""<div class="inv-card" style="--card-accent:var(--red)">
                     <div class="inv-num">Extraction Error</div>
                     {err_html}
-                </div>''', unsafe_allow_html=True)
+                </div>""",
+                    unsafe_allow_html=True,
+                )
 
     # --- Check if all reviews are resolved ---
-    review_decisions = st.session_state.get('review_decisions', {})
-    all_reviewed = all(d is not None for d in review_decisions.values()) if review_decisions else True
+    review_decisions = st.session_state.get("review_decisions", {})
+    all_reviewed = (
+        all(d is not None for d in review_decisions.values())
+        if review_decisions
+        else True
+    )
     confirmed_indices = [i for i, d in review_decisions.items() if d == "confirmed"]
 
     # If there are confirmed items that need writing, rebuild the Excel
-    if confirmed_indices and all_reviewed and not st.session_state.get('reviews_written'):
-        nominal_rows = st.session_state.get('nominal_mapping_rows', [])
+    if (
+        confirmed_indices
+        and all_reviewed
+        and not st.session_state.get("reviews_written")
+    ):
+        nominal_rows = st.session_state.get("nominal_mapping_rows", [])
 
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             maintenance_path = temp_path / "maintenance.xlsx"
-            maintenance_path.write_bytes(st.session_state['updated_excel_bytes'])
+            maintenance_path.write_bytes(st.session_state["updated_excel_bytes"])
 
             with ExcelWriter(maintenance_path, create_backup=False) as writer:
                 for idx in confirmed_indices:
                     result = review_results[idx]
                     inv = result.invoice
                     nom_code = lookup_nominal_code(
-                        inv.supplier_name, nominal_rows,
-                        invoice_text=f"{inv.description} {inv.raw_text}"
+                        inv.supplier_name,
+                        nominal_rows,
+                        invoice_text=f"{inv.description} {inv.raw_text}",
                     )
                     writer.update_po_record(
                         result.po_record.sheet_name,
@@ -862,12 +910,12 @@ if st.session_state.get('processed'):
                         result.invoice.invoice_number,
                         result.invoice.net_amount,
                         datetime.now(),
-                        nominal_code=nom_code
+                        nominal_code=nom_code,
                     )
 
-            with open(maintenance_path, 'rb') as f:
-                st.session_state['updated_excel_bytes'] = f.read()
-            st.session_state['reviews_written'] = True
+            with open(maintenance_path, "rb") as f:
+                st.session_state["updated_excel_bytes"] = f.read()
+            st.session_state["reviews_written"] = True
 
     # --- Download section ---
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
@@ -877,34 +925,36 @@ if st.session_state.get('processed'):
     else:
         confirmed_count = len(confirmed_indices)
         if confirmed_count > 0:
-            st.info(f"Excel includes {len(auto_results)} auto-updated + {confirmed_count} confirmed invoices.")
+            st.info(
+                f"Excel includes {len(auto_results)} auto-updated + {confirmed_count} confirmed invoices."
+            )
 
         dc1, dc2, dc3 = st.columns(3)
 
         with dc1:
             st.download_button(
                 label="Download Updated Excel",
-                data=st.session_state['updated_excel_bytes'],
+                data=st.session_state["updated_excel_bytes"],
                 file_name=f"Maintenance_POs_Updated_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 type="primary",
-                use_container_width=True
+                use_container_width=True,
             )
 
         with dc2:
             st.download_button(
                 label="Download CSV Summary",
-                data=st.session_state['csv_content'],
+                data=st.session_state["csv_content"],
                 file_name=f"invoice_summary_{datetime.now().strftime('%Y%m%d')}.csv",
                 mime="text/csv",
-                use_container_width=True
+                use_container_width=True,
             )
 
         with dc3:
             st.download_button(
                 label="Download Detailed Report",
-                data=st.session_state['report_content'],
+                data=st.session_state["report_content"],
                 file_name=f"invoice_report_{datetime.now().strftime('%Y%m%d')}.txt",
                 mime="text/plain",
-                use_container_width=True
+                use_container_width=True,
             )
