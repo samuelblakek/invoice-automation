@@ -439,7 +439,7 @@ with st.sidebar:
                 for r in rows
             )
             st.markdown(
-                f'<div style="max-height:260px;overflow-y:auto">{list_html}</div>',
+                f'<div style="max-height:260px;overflow-y:auto;border:1px solid var(--border-medium);border-radius:6px;padding:0.4rem 0.6rem;margin-bottom:0.75rem">{list_html}</div>',
                 unsafe_allow_html=True
             )
         else:
@@ -452,11 +452,15 @@ with st.sidebar:
                                  placeholder="e.g. 7820 Stores Repairs")
         if st.button("Add", use_container_width=True, key="add_nominal",
                       disabled=not (new_supplier and new_code)):
+            added_name = new_supplier.strip()
             st.session_state['nominal_mapping_rows'].append(
-                {"Supplier": new_supplier.strip(), "Nominal Code": new_code.strip()}
+                {"Supplier": added_name, "Nominal Code": new_code.strip()}
             )
             save_nominal_codes_to_disk(st.session_state['nominal_mapping_rows'])
-            st.toast(f"Added {new_supplier.strip()}")
+            # Clear input fields
+            del st.session_state['new_nom_supplier']
+            del st.session_state['new_nom_code']
+            st.toast(f"Added {added_name}")
             st.rerun()
 
         # Delete entry
@@ -471,6 +475,7 @@ with st.sidebar:
                     r for r in rows if r["Supplier"] != del_choice
                 ]
                 save_nominal_codes_to_disk(st.session_state['nominal_mapping_rows'])
+                del st.session_state['del_nominal_select']
                 st.toast(f"Removed {del_choice}")
                 st.rerun()
 
