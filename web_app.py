@@ -428,8 +428,16 @@ with st.sidebar:
     if 'nominal_mapping_rows' not in st.session_state:
         st.session_state['nominal_mapping_rows'] = load_nominal_codes_from_disk()
 
+    nom_gen = st.session_state.get('nom_input_gen', 0)
+
     with st.expander("Supplier Nominal Codes"):
+        # Show feedback from previous action
+        nom_msg = st.session_state.pop('nom_feedback', None)
+        if nom_msg:
+            st.success(nom_msg)
+
         rows = st.session_state['nominal_mapping_rows']
+        scroll_to_bottom = st.session_state.pop('nom_scroll_bottom', False)
         if rows:
             list_html = "".join(
                 f'<div style="padding:0.3rem 0;border-bottom:1px solid var(--border-subtle)">'
@@ -438,17 +446,20 @@ with st.sidebar:
                 f'</div>'
                 for r in rows
             )
+            scroll_js = ""
+            if scroll_to_bottom:
+                scroll_js = '<script>var el=document.getElementById("nom-list");if(el)el.scrollTop=el.scrollHeight;</script>'
             st.markdown(
-                f'<div style="max-height:260px;overflow-y:auto;border:1px solid var(--border-medium);border-radius:6px;padding:0.4rem 0.6rem;margin-bottom:0.75rem">{list_html}</div>',
+                f'<div id="nom-list" style="max-height:260px;overflow-y:auto;border:1px solid var(--border-medium);border-radius:6px;padding:0.4rem 0.6rem;margin-bottom:0.75rem">{list_html}</div>{scroll_js}',
                 unsafe_allow_html=True
             )
         else:
             st.caption("No mappings configured")
 
         # Add new entry
-        new_supplier = st.text_input("Supplier", key="new_nom_supplier",
+        new_supplier = st.text_input("Supplier", key=f"new_nom_supplier_{nom_gen}",
                                      placeholder="e.g. Lamp Shop Online")
-        new_code = st.text_input("Nominal Code", key="new_nom_code",
+        new_code = st.text_input("Nominal Code", key=f"new_nom_code_{nom_gen}",
                                  placeholder="e.g. 7820 Stores Repairs")
         if st.button("Add", use_container_width=True, key="add_nominal",
                       disabled=not (new_supplier and new_code)):
@@ -457,10 +468,9 @@ with st.sidebar:
                 {"Supplier": added_name, "Nominal Code": new_code.strip()}
             )
             save_nominal_codes_to_disk(st.session_state['nominal_mapping_rows'])
-            # Clear input fields
-            del st.session_state['new_nom_supplier']
-            del st.session_state['new_nom_code']
-            st.toast(f"Added {added_name}")
+            st.session_state['nom_input_gen'] = nom_gen + 1
+            st.session_state['nom_feedback'] = f"Added {added_name}"
+            st.session_state['nom_scroll_bottom'] = True
             st.rerun()
 
         # Delete entry
@@ -468,15 +478,15 @@ with st.sidebar:
             del_options = [r["Supplier"] for r in rows]
             del_choice = st.selectbox("Remove supplier", del_options,
                                       index=None, placeholder="Select to remove...",
-                                      key="del_nominal_select")
+                                      key=f"del_nominal_select_{nom_gen}")
             if del_choice and st.button("Remove", use_container_width=True,
                                          key="del_nominal"):
                 st.session_state['nominal_mapping_rows'] = [
                     r for r in rows if r["Supplier"] != del_choice
                 ]
                 save_nominal_codes_to_disk(st.session_state['nominal_mapping_rows'])
-                del st.session_state['del_nominal_select']
-                st.toast(f"Removed {del_choice}")
+                st.session_state['nom_input_gen'] = nom_gen + 1
+                st.session_state['nom_feedback'] = f"Removed {del_choice}"
                 st.rerun()
 
     st.markdown("")
