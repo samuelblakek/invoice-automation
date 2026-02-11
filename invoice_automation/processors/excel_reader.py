@@ -13,9 +13,9 @@ from ..utils import DateParser
 class ExcelReader:
     """Reader for loading data from Excel workbooks."""
 
-    def __init__(self, maintenance_workbook_path: Path, cost_centre_path: Path):
+    def __init__(self, maintenance_workbook_path: Path, cost_centre_path: Path = None):
         self.maintenance_workbook_path = Path(maintenance_workbook_path)
-        self.cost_centre_path = Path(cost_centre_path)
+        self.cost_centre_path = Path(cost_centre_path) if cost_centre_path else None
         self.date_parser = DateParser()
 
     def _read_sheet_with_header_detection(self, sheet_name: str) -> Optional[pd.DataFrame]:

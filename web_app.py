@@ -15,7 +15,6 @@ from invoice_automation.extractors import (
 )
 from invoice_automation.models import ValidationResult
 from invoice_automation.reports.report_generator import ReportGenerator
-import pandas as pd
 import pdfplumber
 
 
@@ -425,78 +424,58 @@ with st.sidebar:
         key=f"maintenance_uploader_{upload_gen}"
     )
 
-    cost_centre = st.file_uploader(
-        "Cost Centre Summary",
-        type=['xlsx'],
-        help="Cost Centre Summary (Addresses & Nominal Codes)",
-        key=f"cost_centre_uploader_{upload_gen}"
-    )
-
     # --- Nominal code mapping (always visible, backed by JSON file) ---
     if 'nominal_mapping_rows' not in st.session_state:
         st.session_state['nominal_mapping_rows'] = load_nominal_codes_from_disk()
 
     with st.expander("Supplier Nominal Codes"):
-        mapping_df = pd.DataFrame(
-            st.session_state['nominal_mapping_rows']
-            if st.session_state['nominal_mapping_rows']
-            else [{"Supplier": "", "Nominal Code": ""}]
-        )
-        edited_df = st.data_editor(
-            mapping_df,
-            num_rows="dynamic",
-            use_container_width=True,
-            key="nominal_editor"
-        )
-        st.session_state['nominal_mapping_rows'] = edited_df.to_dict('records')
+        rows = st.session_state['nominal_mapping_rows']
+        if rows:
+            list_html = "".join(
+                f'<div style="padding:0.3rem 0;border-bottom:1px solid var(--border-subtle)">'
+                f'<div style="color:var(--text-primary);font-size:0.82rem">{r["Supplier"]}</div>'
+                f'<div style="color:var(--text-muted);font-size:0.75rem">{r["Nominal Code"]}</div>'
+                f'</div>'
+                for r in rows
+            )
+            st.markdown(
+                f'<div style="max-height:260px;overflow-y:auto">{list_html}</div>',
+                unsafe_allow_html=True
+            )
+        else:
+            st.caption("No mappings configured")
 
-        col_save, col_import = st.columns(2)
-        with col_save:
-            if st.button("Save", use_container_width=True, key="save_nominal"):
-                # Filter out empty rows before saving
-                clean = [
-                    r for r in st.session_state['nominal_mapping_rows']
-                    if str(r.get('Supplier', '')).strip()
-                    and str(r.get('Nominal Code', '')).strip()
+        # Add new entry
+        new_supplier = st.text_input("Supplier", key="new_nom_supplier",
+                                     placeholder="e.g. Lamp Shop Online")
+        new_code = st.text_input("Nominal Code", key="new_nom_code",
+                                 placeholder="e.g. 7820 Stores Repairs")
+        if st.button("Add", use_container_width=True, key="add_nominal",
+                      disabled=not (new_supplier and new_code)):
+            st.session_state['nominal_mapping_rows'].append(
+                {"Supplier": new_supplier.strip(), "Nominal Code": new_code.strip()}
+            )
+            save_nominal_codes_to_disk(st.session_state['nominal_mapping_rows'])
+            st.toast(f"Added {new_supplier.strip()}")
+            st.rerun()
+
+        # Delete entry
+        if rows:
+            del_options = [r["Supplier"] for r in rows]
+            del_choice = st.selectbox("Remove supplier", del_options,
+                                      index=None, placeholder="Select to remove...",
+                                      key="del_nominal_select")
+            if del_choice and st.button("Remove", use_container_width=True,
+                                         key="del_nominal"):
+                st.session_state['nominal_mapping_rows'] = [
+                    r for r in rows if r["Supplier"] != del_choice
                 ]
-                save_nominal_codes_to_disk(clean)
-                st.session_state['nominal_mapping_rows'] = clean
-                st.toast("Nominal codes saved")
-        with col_import:
-            if cost_centre and st.button("Import from File", use_container_width=True,
-                                         key="import_nominal"):
-                with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
-                    tmp.write(cost_centre.getvalue())
-                    tmp_path = tmp.name
-                try:
-                    reader = ExcelReader(Path(tmp_path), Path(tmp_path))
-                    raw_mapping = reader.load_nominal_code_mapping()
-                    new_rows = [
-                        {"Supplier": k.title(), "Nominal Code": v}
-                        for k, v in raw_mapping.items()
-                    ]
-                    # Merge: add any suppliers not already present
-                    existing = {
-                        str(r.get('Supplier', '')).strip().lower()
-                        for r in st.session_state['nominal_mapping_rows']
-                    }
-                    merged = list(st.session_state['nominal_mapping_rows'])
-                    added = 0
-                    for row in new_rows:
-                        if row['Supplier'].strip().lower() not in existing:
-                            merged.append(row)
-                            added += 1
-                    st.session_state['nominal_mapping_rows'] = merged
-                    save_nominal_codes_to_disk(merged)
-                    st.toast(f"Imported {added} new supplier(s)")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Import failed: {e}")
-                finally:
-                    Path(tmp_path).unlink(missing_ok=True)
+                save_nominal_codes_to_disk(st.session_state['nominal_mapping_rows'])
+                st.toast(f"Removed {del_choice}")
+                st.rerun()
 
     st.markdown("")
-    all_files_uploaded = bool(invoice_pdfs and maintenance_po and cost_centre)
+    all_files_uploaded = bool(invoice_pdfs and maintenance_po)
     process_button = st.button(
         "Process Invoices",
         type="primary",
@@ -582,11 +561,8 @@ if process_button and all_files_uploaded:
             maintenance_path = temp_path / "maintenance.xlsx"
             maintenance_path.write_bytes(maintenance_po.read())
 
-            cost_centre_path = temp_path / "cost_centre.xlsx"
-            cost_centre_path.write_bytes(cost_centre.read())
-
             # Initialize components
-            excel_reader = ExcelReader(maintenance_path, cost_centre_path)
+            excel_reader = ExcelReader(maintenance_path)
             validator = InvoiceValidator(excel_reader)
 
             # Process each invoice
