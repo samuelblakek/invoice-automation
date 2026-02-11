@@ -322,7 +322,12 @@ def lookup_nominal_code(supplier_name: str, rows: list[dict],
         return parts[1].strip() if len(parts) > 1 else ""
 
     def name_matches(entry_base: str, supplier: str) -> bool:
-        return entry_base in supplier or supplier in entry_base
+        if entry_base in supplier or supplier in entry_base:
+            return True
+        # Also try with spaces stripped (e.g. "LampShopOnline" vs "lamp shop online")
+        entry_nospace = entry_base.replace(" ", "")
+        supplier_nospace = supplier.replace(" ", "")
+        return entry_nospace in supplier_nospace or supplier_nospace in entry_nospace
 
     # Collect all matching rows
     matches = []
@@ -669,16 +674,26 @@ if process_button and all_files_uploaded:
             progress_bar.empty()
             status_text.empty()
 
-            # Write auto-updated results to Excel
+            # Look up nominal codes and warn on misses
             nominal_rows = st.session_state.get('nominal_mapping_rows', [])
+            for result in results:
+                if result.invoice:
+                    inv = result.invoice
+                    nom_code = lookup_nominal_code(
+                        inv.supplier_name, nominal_rows,
+                        invoice_text=f"{inv.description} {inv.raw_text}"
+                    )
+                    result._nominal_code = nom_code
+                    if not nom_code:
+                        result.warnings.append(
+                            f"No nominal code mapping for '{inv.supplier_name}'"
+                        )
+
+            # Write auto-updated results to Excel
             with ExcelWriter(maintenance_path, create_backup=False) as writer:
                 for result in results:
                     if result.can_auto_update:
-                        inv = result.invoice
-                        nom_code = lookup_nominal_code(
-                            inv.supplier_name, nominal_rows,
-                            invoice_text=f"{inv.description} {inv.raw_text}"
-                        )
+                        nom_code = getattr(result, '_nominal_code', '')
                         writer.update_po_record(
                             result.po_record.sheet_name,
                             result.po_record.row_index,
