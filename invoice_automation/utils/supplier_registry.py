@@ -34,9 +34,7 @@ SUPPLIER_REGISTRY: list[tuple[list[str], list[str], str, str]] = [
 ]
 
 
-def identify_supplier(
-    text: str, filename: str = ""
-) -> tuple[str, str]:
+def identify_supplier(text: str, filename: str = "") -> tuple[str, str]:
     """
     Identify supplier from invoice text and/or filename.
 

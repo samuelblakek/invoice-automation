@@ -2,8 +2,10 @@
 Amazon Business invoice extractor.
 """
 
-from pathlib import Path
+from datetime import datetime
 from decimal import Decimal
+from pathlib import Path
+from typing import Optional
 import re
 
 from .base_extractor import BaseExtractor, PDFExtractionError
@@ -102,7 +104,9 @@ class AmazonExtractor(BaseExtractor):
 
         return ""
 
-    def _extract_po_and_code(self, text: str) -> tuple:
+    def _extract_po_and_code(
+        self, text: str
+    ) -> tuple[str, Optional[str], Optional[str]]:
         """
         Extract PO number and nominal code from PO field.
 
@@ -129,7 +133,7 @@ class AmazonExtractor(BaseExtractor):
 
         return "", None, None
 
-    def _extract_invoice_date(self, text: str) -> any:
+    def _extract_invoice_date(self, text: str) -> Optional[datetime]:
         """Extract invoice date."""
         # Pattern: "Invoice date 3 April 2025"
         match = re.search(
@@ -140,7 +144,9 @@ class AmazonExtractor(BaseExtractor):
             return self.date_parser.parse_date(date_str)
         return None
 
-    def _extract_store_info(self, text: str, store_from_po: str = None) -> tuple:
+    def _extract_store_info(
+        self, text: str, store_from_po: Optional[str] = None
+    ) -> tuple[str, str]:
         """
         Extract store location and address.
 
@@ -177,7 +183,9 @@ class AmazonExtractor(BaseExtractor):
 
         return store_location, ""
 
-    def _extract_amounts(self, text: str) -> tuple:
+    def _extract_amounts(
+        self, text: str
+    ) -> tuple[Optional[Decimal], Optional[Decimal], Optional[Decimal]]:
         """
         Extract net amount, VAT, and total.
 

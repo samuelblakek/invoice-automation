@@ -41,7 +41,7 @@ class SheetSelector:
         return SheetSelector.SUPPLIER_SHEET_MAP.get(supplier_type.upper())
 
     @staticmethod
-    def get_all_sheets() -> list:
+    def get_all_sheets() -> list[str]:
         """
         Get list of all maintenance PO sheets.
 

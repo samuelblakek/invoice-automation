@@ -2,12 +2,17 @@
 Excel writer for updating PO records while preserving formatting.
 """
 
+import logging
 from pathlib import Path
 from datetime import datetime
 from decimal import Decimal
+from typing import Optional
+
 import openpyxl
 from openpyxl.styles import PatternFill
 from shutil import copy2
+
+logger = logging.getLogger(__name__)
 
 # Light blue fill applied to rows updated by automation
 _UPDATED_ROW_FILL = PatternFill(
@@ -34,7 +39,7 @@ class ExcelWriter:
         if create_backup:
             backup_path = self.workbook_path.with_suffix(".backup.xlsx")
             copy2(self.workbook_path, backup_path)
-            print(f"Created backup: {backup_path}")
+            logger.info("Created backup: %s", backup_path)
 
         # Load workbook
         self.workbook = openpyxl.load_workbook(self.workbook_path)
@@ -65,7 +70,7 @@ class ExcelWriter:
         try:
             # Get the worksheet
             if sheet_name not in self.workbook.sheetnames:
-                print(f"Error: Sheet '{sheet_name}' not found")
+                logger.error("Sheet '%s' not found", sheet_name)
                 return False
 
             ws = self.workbook[sheet_name]
@@ -76,7 +81,7 @@ class ExcelWriter:
             # Let's search for the header row first
             header_row = self._find_header_row(ws)
             if header_row is None:
-                print(f"Error: Could not find header row in sheet '{sheet_name}'")
+                logger.error("Could not find header row in sheet '%s'", sheet_name)
                 return False
 
             # Actual Excel row = header_row + row_index + 1
@@ -90,7 +95,9 @@ class ExcelWriter:
             col_invoice_signed = self._find_column(ws, header_row, "INVOICE SIGNED")
 
             if not all([col_invoice_no, col_invoice_amount, col_invoice_signed]):
-                print(f"Error: Could not find required columns in sheet '{sheet_name}'")
+                logger.error(
+                    "Could not find required columns in sheet '%s'", sheet_name
+                )
                 return False
 
             # Update the cells
@@ -115,14 +122,14 @@ class ExcelWriter:
                 ws.cell(row=excel_row, column=col).fill = _UPDATED_ROW_FILL
 
             self.modified = True
-            print(f"Updated row {excel_row} in sheet '{sheet_name}'")
+            logger.info("Updated row %d in sheet '%s'", excel_row, sheet_name)
             return True
 
-        except Exception as e:
-            print(f"Error updating PO record: {e}")
+        except Exception:
+            logger.exception("Error updating PO record")
             return False
 
-    def _find_header_row(self, ws) -> int:
+    def _find_header_row(self, ws) -> Optional[int]:
         """
         Find the header row in a worksheet.
 
@@ -144,7 +151,7 @@ class ExcelWriter:
                         return row_num
         return None
 
-    def _find_column(self, ws, header_row: int, column_name: str) -> int:
+    def _find_column(self, ws, header_row: int, column_name: str) -> Optional[int]:
         """
         Find the column index for a given column name.
 
@@ -171,15 +178,15 @@ class ExcelWriter:
             True if save successful, False otherwise
         """
         if not self.modified:
-            print("No changes to save")
+            logger.debug("No changes to save")
             return True
 
         try:
             self.workbook.save(self.workbook_path)
-            print(f"Saved changes to {self.workbook_path}")
+            logger.info("Saved changes to %s", self.workbook_path)
             return True
-        except Exception as e:
-            print(f"Error saving workbook: {e}")
+        except Exception:
+            logger.exception("Error saving workbook")
             return False
 
     def close(self):

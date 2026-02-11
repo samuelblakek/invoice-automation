@@ -2,8 +2,10 @@
 Generic invoice extractor (fallback for unknown suppliers).
 """
 
-from pathlib import Path
+from datetime import datetime
 from decimal import Decimal
+from pathlib import Path
+from typing import Optional
 import re
 
 from .base_extractor import BaseExtractor, PDFExtractionError
@@ -200,7 +202,7 @@ class GenericExtractor(BaseExtractor):
 
         return True
 
-    def _extract_date(self, text: str) -> object:
+    def _extract_date(self, text: str) -> Optional[datetime]:
         """Extract invoice date."""
         date_patterns = [
             r"(?:Invoice|Tax)\s*(?:Date|Point)[/\s]*(?:Date)?\s*:?\s*(\d{1,2}[\s/-]\w+[\s/-]\d{2,4})",
@@ -316,7 +318,11 @@ class GenericExtractor(BaseExtractor):
             re.IGNORECASE | re.DOTALL,
         )
         if match:
-            lines = [line.strip() for line in match.group(1).strip().split("\n") if line.strip()]
+            lines = [
+                line.strip()
+                for line in match.group(1).strip().split("\n")
+                if line.strip()
+            ]
             if lines:
                 city = re.sub(r"[A-Z]{1,2}\d{1,2}\s*\d[A-Z]{2}", "", lines[-1]).strip()
                 if city and len(city) > 2 and not city.lower().startswith("unit"):

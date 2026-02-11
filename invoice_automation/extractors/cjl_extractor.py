@@ -2,7 +2,10 @@
 CJL Group invoice extractor.
 """
 
+from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
+from typing import Optional
 import re
 
 from .base_extractor import BaseExtractor, PDFExtractionError
@@ -115,7 +118,7 @@ class CJLExtractor(BaseExtractor):
 
         return ""
 
-    def _extract_invoice_date(self, text: str) -> any:
+    def _extract_invoice_date(self, text: str) -> Optional[datetime]:
         """Extract invoice date."""
         # Pattern: "Invoice Date : 12 May 2025"
         match = re.search(
@@ -126,7 +129,7 @@ class CJLExtractor(BaseExtractor):
             return self.date_parser.parse_date(date_str)
         return None
 
-    def _extract_store_info(self, text: str) -> tuple:
+    def _extract_store_info(self, text: str) -> tuple[str, str]:
         """
         Extract store location and address.
 
@@ -151,7 +154,9 @@ class CJLExtractor(BaseExtractor):
 
         return "", ""
 
-    def _extract_amounts(self, text: str) -> tuple:
+    def _extract_amounts(
+        self, text: str
+    ) -> tuple[Optional[Decimal], Optional[Decimal], Optional[Decimal]]:
         """
         Extract net amount, VAT, and total.
 

@@ -10,9 +10,6 @@ import re
 class AmountParser:
     """Utility class for parsing currency amounts."""
 
-    # Pattern to match currency amounts with optional £ symbol
-    AMOUNT_PATTERN = r"[£$]?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)"
-
     @staticmethod
     def parse_amount(amount_str: str) -> Optional[Decimal]:
         """
@@ -80,28 +77,6 @@ class AmountParser:
             return None
 
     @staticmethod
-    def calculate_vat(
-        net: Optional[Decimal], vat_rate: Decimal = Decimal("0.20")
-    ) -> Optional[Decimal]:
-        """
-        Calculate VAT from net amount using a given rate.
-
-        Args:
-            net: Net amount excluding VAT
-            vat_rate: VAT rate as decimal (default 0.20 for 20%)
-
-        Returns:
-            VAT amount, or None if net is None
-        """
-        if net is None:
-            return None
-
-        try:
-            return net * vat_rate
-        except (TypeError, InvalidOperation):
-            return None
-
-    @staticmethod
     def calculate_total(
         net: Optional[Decimal], vat: Optional[Decimal]
     ) -> Optional[Decimal]:
@@ -122,71 +97,3 @@ class AmountParser:
             return net + vat
         except (TypeError, InvalidOperation):
             return None
-
-    @staticmethod
-    def is_valid_amount(
-        amount: Optional[Decimal], min_value: Decimal = Decimal("0")
-    ) -> bool:
-        """
-        Check if an amount is valid (non-negative by default).
-
-        Args:
-            amount: The amount to check
-            min_value: Minimum valid amount (default 0)
-
-        Returns:
-            True if amount is valid, False otherwise
-        """
-        if amount is None:
-            return False
-
-        try:
-            return amount >= min_value
-        except (TypeError, InvalidOperation):
-            return False
-
-    @staticmethod
-    def format_amount(amount: Optional[Decimal], currency_symbol: str = "£") -> str:
-        """
-        Format an amount as a currency string.
-
-        Args:
-            amount: The amount to format
-            currency_symbol: Currency symbol to use (default £)
-
-        Returns:
-            Formatted currency string (e.g., "£116.50")
-        """
-        if amount is None:
-            return f"{currency_symbol}0.00"
-
-        return f"{currency_symbol}{amount:.2f}"
-
-    @staticmethod
-    def verify_vat_calculation(
-        net: Optional[Decimal],
-        vat: Optional[Decimal],
-        total: Optional[Decimal],
-        tolerance: Decimal = Decimal("0.02"),
-    ) -> bool:
-        """
-        Verify that VAT calculation is correct: total = net + vat (within tolerance).
-
-        Args:
-            net: Net amount
-            vat: VAT amount
-            total: Total amount
-            tolerance: Allowed difference (default 2p for rounding)
-
-        Returns:
-            True if calculation is valid, False otherwise
-        """
-        if None in (net, vat, total):
-            return False
-
-        try:
-            calculated_total = net + vat
-            difference = abs(calculated_total - total)
-            return difference <= tolerance
-        except (TypeError, InvalidOperation):
-            return False

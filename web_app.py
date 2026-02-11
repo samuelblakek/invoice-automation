@@ -21,7 +21,9 @@ from invoice_automation.extractors import (
     GenericExtractor,
 )
 from invoice_automation.models import ValidationResult
-from invoice_automation.utils.supplier_registry import identify_supplier as identify_supplier_from_text
+from invoice_automation.utils.supplier_registry import (
+    identify_supplier as identify_supplier_from_text,
+)
 from invoice_automation.reports.report_generator import ReportGenerator
 import pdfplumber
 
@@ -395,17 +397,24 @@ NOMINAL_CODES_PATH = Path(__file__).parent / "data" / "nominal_codes.json"
 
 def load_nominal_codes_from_disk() -> list[dict]:
     """Load supplier→nominal code mapping from JSON file."""
-    if NOMINAL_CODES_PATH.exists():
+    if not NOMINAL_CODES_PATH.exists():
+        return []
+    try:
         with open(NOMINAL_CODES_PATH) as f:
             return json.load(f)
-    return []
+    except (json.JSONDecodeError, OSError) as exc:
+        st.warning(f"Could not load nominal codes: {exc}")
+        return []
 
 
-def save_nominal_codes_to_disk(rows: list[dict]):
+def save_nominal_codes_to_disk(rows: list[dict]) -> None:
     """Persist supplier→nominal code mapping to JSON file."""
-    NOMINAL_CODES_PATH.parent.mkdir(exist_ok=True)
-    with open(NOMINAL_CODES_PATH, "w") as f:
-        json.dump(rows, f, indent=2)
+    try:
+        NOMINAL_CODES_PATH.parent.mkdir(exist_ok=True)
+        with open(NOMINAL_CODES_PATH, "w") as f:
+            json.dump(rows, f, indent=2)
+    except OSError as exc:
+        st.error(f"Could not save nominal codes: {exc}")
 
 
 def identify_supplier(pdf_path: Path, first_page_text: str) -> str:

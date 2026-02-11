@@ -2,7 +2,10 @@
 AAW National invoice extractor.
 """
 
+from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
+from typing import Optional
 import re
 
 from .base_extractor import BaseExtractor, PDFExtractionError
@@ -112,7 +115,7 @@ class AAWExtractor(BaseExtractor):
 
         return ""
 
-    def _extract_invoice_date(self, text: str) -> any:
+    def _extract_invoice_date(self, text: str) -> Optional[datetime]:
         """Extract invoice date."""
         # Pattern: "Date 08 May 2025" or "Customer Date 08 May 2025"
         match = re.search(r"Date\s+(\d{1,2}\s+\w+\s+\d{4})", text, re.IGNORECASE)
@@ -121,7 +124,7 @@ class AAWExtractor(BaseExtractor):
             return self.date_parser.parse_date(date_str)
         return None
 
-    def _extract_store_info(self, text: str) -> tuple:
+    def _extract_store_info(self, text: str) -> tuple[str, str]:
         """
         Extract store location and address.
 
@@ -147,7 +150,9 @@ class AAWExtractor(BaseExtractor):
 
         return "", ""
 
-    def _extract_amounts(self, text: str) -> tuple:
+    def _extract_amounts(
+        self, text: str
+    ) -> tuple[Optional[Decimal], Optional[Decimal], Optional[Decimal]]:
         """
         Extract net amount, VAT, and total.
 
@@ -199,7 +204,7 @@ class AAWExtractor(BaseExtractor):
             return description[:500]  # Limit length
         return ""
 
-    def _extract_works_completed(self, text: str) -> any:
+    def _extract_works_completed(self, text: str) -> Optional[datetime]:
         """Extract works completed date."""
         # Pattern: "Works Completed: 07 May 2025"
         match = re.search(

@@ -2,13 +2,18 @@
 Excel reader for loading reference data and PO records.
 """
 
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-import pandas as pd
+from datetime import datetime
 from decimal import Decimal
 
-from ..models import PORecord
+import pandas as pd
+
+from ..models import PORecord, Invoice
 from ..utils import DateParser
+
+logger = logging.getLogger(__name__)
 
 
 class ExcelReader:
@@ -43,7 +48,7 @@ class ExcelReader:
                 dtype=str,
             )
         except Exception as e:
-            print(f"Warning: Could not load sheet '{sheet_name}': {e}")
+            logger.warning("Could not load sheet '%s': %s", sheet_name, e)
             self._sheet_cache[sheet_name] = None
             return None
 
@@ -77,8 +82,11 @@ class ExcelReader:
                 dtype=str,
             )
         except Exception as e:
-            print(
-                f"Warning: Could not re-read sheet '{sheet_name}' with header row {header_row}: {e}"
+            logger.warning(
+                "Could not re-read sheet '%s' with header row %d: %s",
+                sheet_name,
+                header_row,
+                e,
             )
             self._sheet_cache[sheet_name] = None
             return None
@@ -90,7 +98,7 @@ class ExcelReader:
         return df
 
     @staticmethod
-    def _normalize_column_name(col_name) -> str:
+    def _normalize_column_name(col_name: object) -> str:
         """Normalize a column name: strip whitespace, replace newlines, map variants."""
         if pd.isna(col_name):
             return ""
@@ -130,26 +138,6 @@ class ExcelReader:
                 sheets[sheet_name] = df
 
         return sheets
-
-    def load_codes_sheet(self) -> pd.DataFrame:
-        """Load the CODES reference sheet."""
-        try:
-            df = pd.read_excel(self.maintenance_workbook_path, sheet_name="CODES")
-            return df
-        except Exception as e:
-            print(f"Warning: Could not load CODES sheet: {e}")
-            return pd.DataFrame()
-
-    def load_cost_centre_summary(self) -> pd.DataFrame:
-        """Load the Cost Centre Summary (store addresses)."""
-        try:
-            df = pd.read_excel(
-                self.cost_centre_path, sheet_name="Cost Centre Summary SK"
-            )
-            return df
-        except Exception as e:
-            print(f"Warning: Could not load Cost Centre Summary: {e}")
-            return pd.DataFrame()
 
     def find_po_record(self, po_number: str, sheet_name: str) -> Optional[PORecord]:
         """
@@ -221,7 +209,7 @@ class ExcelReader:
         return None
 
     def find_po_candidates(
-        self, sheet_name: str, invoice
+        self, sheet_name: str, invoice: Invoice
     ) -> List[Tuple[PORecord, float]]:
         """
         Find candidate PO records using fuzzy multi-field matching.
@@ -320,7 +308,7 @@ class ExcelReader:
         )
 
     @staticmethod
-    def _safe_str(value) -> Optional[str]:
+    def _safe_str(value: object) -> Optional[str]:
         """Convert value to string, handling NaN."""
         if pd.isna(value) or value is None:
             return None
@@ -330,7 +318,7 @@ class ExcelReader:
         return s if s else None
 
     @staticmethod
-    def _safe_decimal(value) -> Optional[Decimal]:
+    def _safe_decimal(value: object) -> Optional[Decimal]:
         """Convert value to Decimal, handling NaN and currency symbols."""
         if pd.isna(value) or value == "" or value is None:
             return None
@@ -343,34 +331,8 @@ class ExcelReader:
         except Exception:
             return None
 
-    def _safe_date(self, value):
+    def _safe_date(self, value: object) -> Optional[datetime]:
         """Convert value to datetime."""
         if pd.isna(value) or value == "" or value is None:
             return None
         return self.date_parser.parse_date(str(value))
-
-    def load_nominal_code_mapping(self) -> dict:
-        """Load supplier -> nominal code mapping from cost centre file tab 3."""
-        try:
-            df = pd.read_excel(
-                self.cost_centre_path,
-                sheet_name=2,  # Tab 3 (0-indexed)
-            )
-            mapping = {}
-            for _, row in df.iterrows():
-                supplier = str(row.iloc[0]).strip()
-                code = str(row.iloc[1]).strip()
-                if supplier and code and supplier != "nan" and code != "nan":
-                    mapping[supplier.lower()] = code
-            return mapping
-        except Exception:
-            return {}
-
-    def get_store_list(self) -> List[str]:
-        """Get list of all valid store names from Cost Centre Summary."""
-        df = self.load_cost_centre_summary()
-        if df.empty:
-            return []
-
-        stores = df.iloc[:, 0].dropna().tolist()
-        return [str(store).strip() for store in stores if store]

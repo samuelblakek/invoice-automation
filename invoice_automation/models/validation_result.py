@@ -4,7 +4,7 @@ Validation Result data models for tracking invoice validation outcomes.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, Any
+from typing import List, Optional
 
 from .invoice import Invoice
 from .po_record import PORecord
@@ -34,8 +34,8 @@ class Validation:
 
     check_name: str
     passed: bool
-    expected: Any
-    actual: Any
+    expected: Optional[str]
+    actual: Optional[str]
     severity: ValidationSeverity
     message: str
 
@@ -127,7 +127,7 @@ class ValidationResult:
     @classmethod
     def create_error(
         cls, pdf_path: str, error_message: str, invoice: Optional[Invoice] = None
-    ):
+    ) -> "ValidationResult":
         """Create a validation result representing a critical error."""
         result = cls(
             invoice=invoice,
