@@ -5,7 +5,11 @@ from pathlib import Path
 from datetime import datetime
 from decimal import Decimal
 import openpyxl
+from openpyxl.styles import PatternFill
 from shutil import copy2
+
+# Light blue fill applied to rows updated by automation
+_UPDATED_ROW_FILL = PatternFill(start_color="DAEEF3", end_color="DAEEF3", fill_type="solid")
 
 
 class ExcelWriter:
@@ -81,6 +85,10 @@ class ExcelWriter:
             ws.cell(row=excel_row, column=col_invoice_no).value = invoice_number
             ws.cell(row=excel_row, column=col_invoice_amount).value = float(invoice_amount)
             ws.cell(row=excel_row, column=col_invoice_signed).value = invoice_signed_date
+
+            # Highlight the entire row light blue to mark it as processed
+            for col in range(1, ws.max_column + 1):
+                ws.cell(row=excel_row, column=col).fill = _UPDATED_ROW_FILL
 
             self.modified = True
             print(f"Updated row {excel_row} in sheet '{sheet_name}'")
