@@ -158,8 +158,11 @@ section[data-testid="stSidebar"] {
 }
 .inv-card .inv-warning {
     color: var(--amber);
-    font-size: 0.8rem;
-    margin-top: 0.3rem;
+    font-size: 0.78rem;
+    margin-top: 0.4rem;
+    padding-left: 1.2em;
+    text-indent: -1.2em;
+    line-height: 1.4;
 }
 
 /* ---------- Column header pills ---------- */
@@ -575,7 +578,7 @@ if st.session_state.get('processed'):
     with col_match:
         st.markdown(f'<div class="col-header col-header-green">Matched ({len(auto_results)})</div>', unsafe_allow_html=True)
         for r in auto_results:
-            warn_html = "".join(f'<div class="inv-warning">{w}</div>' for w in r.warnings)
+            warn_html = "".join(f'<div class="inv-warning">⚠ {w}</div>' for w in r.warnings)
             st.markdown(inv_card_html(r.invoice, r.po_record, warn_html, accent="var(--green)"), unsafe_allow_html=True)
 
     # --- Review column ---
@@ -604,9 +607,9 @@ if st.session_state.get('processed'):
                     st.caption(f"PO: {po.po_number}  |  {po.store}")
 
                 for error in result.errors:
-                    st.markdown(f"<span style='color:var(--amber);font-size:0.8rem'>{error}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<span style='color:var(--amber);font-size:0.78rem'>⚠ {error}</span>", unsafe_allow_html=True)
                 for warning in result.warnings:
-                    st.markdown(f"<span style='color:var(--amber);font-size:0.8rem'>{warning}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<span style='color:var(--amber);font-size:0.78rem'>⚠ {warning}</span>", unsafe_allow_html=True)
 
                 bc1, bc2 = st.columns(2)
                 with bc1:
