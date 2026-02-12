@@ -40,9 +40,8 @@ Thumbs.db
 # Project specific
 .streamlit/secrets.toml
 
-# Keep example files but ignore real data
-!example-files/*.pdf
-!example-files/*.xlsx
+# Example/test data files
+example-files/
 
 # Logs
 *.log
