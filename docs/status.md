@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Status:** Working — tested and functional
+**Status:** Working — clean codebase, ready to resume
 
 The invoice processing pipeline is operational. PDFs are extracted, matched against PO records, validated, and written back to the Maintenance PO spreadsheet with nominal codes populated automatically.
 
@@ -34,6 +34,13 @@ Previous session focused on nominal code persistence and matching:
 - Removed cost centre file dependency
 - Fixed sidebar UI (replaced broken data_editor with compact list + controls)
 - Built smart matching: space-stripped comparison, first-word fallback, work-type scoring for multi-code suppliers
+
+## To Resume
+
+1. `pip install -r requirements.txt` (if deps changed)
+2. `streamlit run web_app.py`
+3. Upload test PDFs from `example-files/` and a Maintenance PO spreadsheet
+4. See `tasks/todo.md` for possible future work
 
 ## Known Limitations
 
