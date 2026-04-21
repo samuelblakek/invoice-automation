@@ -57,6 +57,15 @@ details summary span {
 [data-baseweb="icon"] * {
     font-family: 'Material Symbols Rounded', sans-serif !important;
 }
+/* Restore icon font for Streamlit material icons (file uploader button, etc.) */
+[data-testid="stIconMaterial"],
+[data-testid="stIconMaterial"] *,
+[data-testid="stFileUploaderDropzone"] span[data-testid*="Icon"],
+[data-testid="stFileUploaderDropzone"] span[data-testid*="Icon"] *,
+[data-testid="stFileUploader"] button span[data-testid*="Icon"],
+[data-testid="stFileUploader"] button span[data-testid*="Icon"] * {
+    font-family: 'Material Symbols Rounded', sans-serif !important;
+}
 
 /* ---------- Colour tokens (dark slate / navy) ---------- */
 :root {
