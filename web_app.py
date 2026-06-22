@@ -432,9 +432,14 @@ def identify_supplier(pdf_path: Path, first_page_text: str) -> str:
     return supplier_type
 
 
-@st.cache_resource
 def get_extractors():
-    """Get cached extractor instances."""
+    """Build extractor instances.
+
+    Deliberately NOT cached with @st.cache_resource: the extractors are cheap to
+    construct (a few stateless helpers; compiled regexes are cached at the class
+    level in BaseExtractor), and caching them meant code changes to extractors
+    did not take effect on redeploy until the app was manually rebooted.
+    """
     return {
         "AAW": AAWExtractor(),
         "CJL": CJLExtractor(),
