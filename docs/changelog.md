@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-06-22 — Fix: hyphenated `INV-NNNNN` filenames failed extraction
+
+- **Bug:** Invoices named `INV-10801.pdf` (and similar) raised "Could not extract
+  invoice number from <file>" when no in-PDF invoice-number pattern matched. The
+  filename fallback in `GenericExtractor._extract_invoice_number` used the regex
+  `INV(\d+)`, which requires digits *immediately* after `INV` and so missed any
+  separator (`INV-10801`, `INV_10801`, `INV 10801`).
+- **Fix:** Fallback regex is now `INV([-_ ]?)(\d+)` — the separator is optional;
+  a hyphen/underscore is preserved in the result, whitespace is dropped.
+- Added `tests/test_generic_extractor.py` as a regression guard (runs standalone
+  or under pytest). Verified all 7 example invoices still extract unchanged.
+
+- **Also found & fixed (same ILUX files):** VAT was being read off the net line
+  `Total ex VAT £115.00` by the broad last-resort `\bVAT\b` pattern, so VAT equalled
+  net (e.g. INV-10801 reported VAT £115.00 instead of £23.00). Added a `Total Tax`
+  pattern (ILUX's current template) and a `(?<!ex )` lookbehind on the broad pattern.
+  All 5 ILUX invoices now satisfy net + VAT = total.
+
+- **Corrupted `£` glyph in invoice total:** one supplier's font emits the ASCII
+  `f.` for `£`, so `INVOICE TOTAL f.1212.00` was skipped and the broad pattern
+  grabbed `SUB TOTAL 1010.00` as the total instead. Total patterns now accept
+  `£` or `f.`. `example-files/Invoice 37712.1383.pdf` now reports total £1212.00
+  (was £1010.00); all example invoices satisfy net + VAT = total.
+
 ## 2026-02-11 — Code Cleanup & Tech Debt Removal
 
 - Ran lint (ruff), tech debt, best practices, and performance scans across the codebase

@@ -129,11 +129,14 @@ class GenericExtractor(BaseExtractor):
                 if re.search(r"\d", inv_num) and len(inv_num) >= 2:
                     return inv_num
 
-        # Try filename-based extraction as last resort
-        # "INV29453" in filename
-        match = re.search(r"INV(\d+)", filename, re.IGNORECASE)
+        # Try filename-based extraction as last resort.
+        # Handles "INV29453", "INV-10801", "INV_10801", "INV 10801" — the
+        # separator between "INV" and the digits is optional. A hyphen or
+        # underscore is preserved (e.g. "INV-10801"); whitespace is dropped.
+        match = re.search(r"INV([-_ ]?)(\d+)", filename, re.IGNORECASE)
         if match:
-            return f"INV{match.group(1)}"
+            separator = match.group(1).strip()
+            return f"INV{separator}{match.group(2)}"
 
         # "PSI577608" → "577608"
         match = re.search(r"PSI(\d+)", filename, re.IGNORECASE)
@@ -258,14 +261,17 @@ class GenericExtractor(BaseExtractor):
             r"VAT\s+TOTAL\s+£?([\d,]+\.\d{2})",
             # "VAT at 20.00% 43.60" (Metro Security)
             r"VAT\s+(?:at|@)\s+[\d.]+%\s+£?([\d,]+\.\d{2})",
-            # "Total VAT 164.00" (ILUX)
+            # "Total VAT 164.00" (ILUX older template)
             r"Total\s+VAT\s+£?([\d,]+\.\d{2})",
+            # "Total Tax 23.00" (ILUX current template)
+            r"Total\s+Tax\s+£?([\d,]+\.\d{2})",
             # "No VAT 26.27" (LampShopOnline — "No VAT" means the VAT amount)
             r"No\s+VAT\s+£?([\d,]+\.\d{2})",
             # "£26.46" preceded by VAT rate on same line: "20.00% £26.46"
             r"20\.00%\s+£([\d,]+\.\d{2})",
-            # "VAT 202.00" on same line — must have decimal digits
-            r"\bVAT\b\s+£?([\d,]+\.\d{2})",
+            # "VAT 202.00" on same line — must have decimal digits.
+            # Negative lookbehind avoids matching the net line "Total ex VAT 115.00".
+            r"(?<!ex )\bVAT\b\s+£?([\d,]+\.\d{2})",
         ]
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
@@ -281,12 +287,13 @@ class GenericExtractor(BaseExtractor):
     def _extract_total_amount(self, text: str) -> Decimal:
         """Extract total amount."""
         patterns = [
-            # "INVOICE TOTAL 83.88" (Sunbelt)
-            r"INVOICE\s+TOTAL\s+£?\s*([\d,]+\.\d{2})",
+            # "INVOICE TOTAL 83.88" (Sunbelt) / "INVOICE TOTAL f.1212.00" — some
+            # fonts emit the ASCII "f." for the £ glyph, so accept £ or "f.".
+            r"INVOICE\s+TOTAL\s+(?:£|f\.)?\s*([\d,]+\.\d{2})",
             # "Invoice Total £ 261.60" (Metro Security)
-            r"Invoice\s+Total\s+£?\s*([\d,]+\.\d{2})",
+            r"Invoice\s+Total\s+(?:£|f\.)?\s*([\d,]+\.\d{2})",
             # "TOTAL £984.00" (ILUX)
-            r"\bTOTAL\s+£\s*([\d,]+\.\d{2})",
+            r"\bTOTAL\s+(?:£|f\.)\s*([\d,]+\.\d{2})",
             # "Total Inc VAT 157.61" (LampShopOnline)
             r"Total\s+Inc\s+VAT\s+£?\s*([\d,]+\.\d{2})",
             # "Invoice Totals\n£132.30 £26.46 £158.76" — last amount is total

@@ -51,6 +51,9 @@ Process example PDFs in `example-files/` against the test Excel file (`Maintenan
 - **Supplier name mismatch** — The registry returns names like `"LampShopOnline"` or `"MetSafe"`, which may not match the mapping table's `"Lamp Shop Online"` or `"Metro Security (UK) Limited (MetSafe)"`. The lookup handles this via space-stripped comparison, but new suppliers may need entries in both the registry and the nominal code mapping.
 - **Cost centre file removed** — The Cost Centre Summary uploader was removed. Nominal codes come from JSON, and `ExcelReader.cost_centre_path` is now optional (defaults to `None`).
 - **ExcelReader caches sheet reads** — `_sheet_cache` prevents redundant disk I/O when the same sheet is accessed multiple times during matching. The cache lives for the lifetime of the `ExcelReader` instance.
+- **Filename invoice-number fallback allows separators** — When no in-PDF pattern matches, `GenericExtractor._extract_invoice_number` derives the number from the filename. ILUX files are named `INV-10801.pdf` (hyphen), so the fallback regex is `INV([-_ ]?)(\d+)` — the separator is optional. A bare `INV(\d+)` silently returns nothing for hyphenated names and raises "Could not extract invoice number".
+- **"Total ex VAT" is the NET line, not VAT** — The broad last-resort VAT pattern `\bVAT\b\s+£?(...)` will happily match `Total ex VAT £115.00` and report the net as the VAT. It carries a `(?<!ex )` lookbehind to prevent this. ILUX's current template puts the real VAT on a `Total Tax £23.00` line (older template used `Total VAT`); both patterns are present.
+- **£ may render as `�` in the Windows terminal** — pdfplumber returns a real `£` (U+00A3); it just displays as the replacement glyph under the console code page. Check `ord()`/`repr()` before assuming an encoding problem — the amount regexes treat `£` as optional anyway.
 
 ## UI / Styling
 
