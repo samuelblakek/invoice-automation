@@ -37,6 +37,20 @@ class QuoteValidator:
         Returns:
             Validation result
         """
+        # A non-positive amount means extraction failed — we cannot conclude
+        # "no authorization required" (that would wave through a large invoice
+        # whose amount simply didn't read). The amount validator flags this
+        # separately; here we just avoid a misleading pass.
+        if invoice.net_amount <= 0:
+            return Validation(
+                check_name="Quote Authorization (£200+ Check)",
+                passed=False,
+                expected="A readable invoice amount",
+                actual=f"£{invoice.net_amount}",
+                severity=ValidationSeverity.WARNING,
+                message="Cannot check £200 authorization — invoice amount was not extracted.",
+            )
+
         # Check if invoice amount exceeds threshold
         if invoice.net_amount <= self.threshold:
             # No authorization required

@@ -19,6 +19,19 @@ _UPDATED_ROW_FILL = PatternFill(
     start_color="DAEEF3", end_color="DAEEF3", fill_type="solid"
 )
 
+# Leading characters Excel treats as the start of a formula. Text derived from
+# untrusted PDFs (e.g. the invoice number) is prefixed with an apostrophe when
+# it starts with one of these, to prevent spreadsheet formula injection when the
+# downloaded workbook is opened.
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _guard_formula(value: object) -> object:
+    """Neutralise spreadsheet-formula injection in a text cell value."""
+    if isinstance(value, str) and value[:1] in _FORMULA_PREFIXES:
+        return "'" + value
+    return value
+
 
 class ExcelWriter:
     """Writer for updating Excel workbooks while preserving formatting."""
@@ -100,8 +113,11 @@ class ExcelWriter:
                 )
                 return False
 
-            # Update the cells
-            ws.cell(row=excel_row, column=col_invoice_no).value = invoice_number
+            # Update the cells. invoice_number is PDF/filename-derived (untrusted),
+            # so guard against Excel formula injection; the amount is a float.
+            ws.cell(row=excel_row, column=col_invoice_no).value = _guard_formula(
+                invoice_number
+            )
             ws.cell(row=excel_row, column=col_invoice_amount).value = float(
                 invoice_amount
             )
@@ -115,7 +131,9 @@ class ExcelWriter:
                 if col_nominal:
                     existing = ws.cell(row=excel_row, column=col_nominal).value
                     if not existing or str(existing).strip() == "":
-                        ws.cell(row=excel_row, column=col_nominal).value = nominal_code
+                        ws.cell(
+                            row=excel_row, column=col_nominal
+                        ).value = _guard_formula(nominal_code)
 
             # Highlight the entire row light blue to mark it as processed
             for col in range(1, ws.max_column + 1):

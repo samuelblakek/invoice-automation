@@ -98,13 +98,16 @@ class ValidationResult:
         """Invoice has a PO match but needs user confirmation due to uncertain matching."""
         if self.can_auto_update or self.po_record is None:
             return False
-        # Reviewable if the only errors are store/match confidence issues
+        # Reviewable if the only errors are confidence/verification issues the
+        # user can confirm (store mismatch, fuzzy PO, amount reconciliation) —
+        # not hard failures like a missing PO or invalid (£0) amount.
+        reviewable_checks = ("Store Match", "PO Match", "Amount Reconciliation")
         hard_errors = [
             v
             for v in self.validations
             if not v.passed
             and v.severity == ValidationSeverity.ERROR
-            and v.check_name not in ("Store Match", "PO Match")
+            and v.check_name not in reviewable_checks
         ]
         # Not reviewable if PO is already invoiced
         has_duplicate = any(

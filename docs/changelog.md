@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-06-22 — Review fixes: correctness, security, error handling, tests
+
+Acting on a multi-agent code/security/app review:
+
+- **Amount correctness:** added a net + VAT = total reconciliation check (and an
+  optional cross-check against the PO's recorded amount). A mismatch is now a
+  reviewable error — the invoice goes to Review for confirmation instead of
+  auto-posting a likely mis-read amount. A £0 amount no longer reports
+  "no authorization required".
+- **Matching:** PO lookup is now exact-per-line instead of substring, so a
+  truncated PO (`OT040`) can't match a different longer PO (`OT0402`).
+- **Robustness:** a maintenance sheet that exists but fails to load is surfaced
+  as a UI banner (`ExcelReader.load_warnings`) instead of silently making every
+  PO on it "not found"; absent optional sheets stay quiet (debug-level).
+- **Extraction:** broadened the VAT lookbehind (`exc`/`excl`/`ex.`) and required
+  decimals in the broad NET fallback so "Net 30 days" can't become net=30.
+- **Security:** HTML-escaped all PDF-derived fields rendered in result cards
+  (stored-XSS fix) and guarded the Excel write-back against formula injection
+  (`= + - @` prefixes). Uploaded filenames are reduced to their basename.
+- **Error handling:** the per-invoice handler now catches `PDFExtractionError`
+  for the user-facing card and logs unexpected exceptions with a full traceback
+  under a distinct message, so a bug no longer masquerades as a bad PDF.
+- **Tests:** added `tests/test_matching.py` (PO strategies, cross-sheet fallback,
+  not-found guard, exact-vs-substring, fuzzy-only-for-PO-less, amount
+  reconciliation) with a generated `.xlsx` fixture.
+
 ## 2026-06-22 — Tighten fuzzy matching: stated-but-missing PO reports "not found"
 
 When an invoice states a PO that isn't in any maintenance sheet, the matcher no

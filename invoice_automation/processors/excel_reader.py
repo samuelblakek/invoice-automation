@@ -38,6 +38,23 @@ class ExcelReader:
         self.cost_centre_path = Path(cost_centre_path) if cost_centre_path else None
         self.date_parser = DateParser()
         self._sheet_cache: Dict[str, Optional[pd.DataFrame]] = {}
+        self._workbook_sheets: Optional[set] = None
+        # Sheets that EXIST in the workbook but couldn't be loaded / had no
+        # detectable header. Surfaced to the user because they silently turn
+        # every PO on that sheet into a "not found" — a wrong, confident result.
+        self.load_warnings: List[str] = []
+
+    def _existing_sheet_names(self) -> set:
+        """Names of sheets actually present in the workbook (cached)."""
+        if self._workbook_sheets is None:
+            try:
+                self._workbook_sheets = set(
+                    pd.ExcelFile(self.maintenance_workbook_path).sheet_names
+                )
+            except Exception as e:
+                logger.warning("Could not list workbook sheets: %s", e)
+                self._workbook_sheets = set()
+        return self._workbook_sheets
 
     def _read_sheet_with_header_detection(
         self, sheet_name: str
@@ -62,7 +79,7 @@ class ExcelReader:
                 dtype=str,
             )
         except Exception as e:
-            logger.warning("Could not load sheet '%s': %s", sheet_name, e)
+            self._record_load_failure(sheet_name, e)
             self._sheet_cache[sheet_name] = None
             return None
 
@@ -96,12 +113,7 @@ class ExcelReader:
                 dtype=str,
             )
         except Exception as e:
-            logger.warning(
-                "Could not re-read sheet '%s' with header row %d: %s",
-                sheet_name,
-                header_row,
-                e,
-            )
+            self._record_load_failure(sheet_name, e)
             self._sheet_cache[sheet_name] = None
             return None
 
@@ -110,6 +122,24 @@ class ExcelReader:
 
         self._sheet_cache[sheet_name] = df
         return df
+
+    def _record_load_failure(self, sheet_name: str, error: Exception) -> None:
+        """Handle a sheet read failure.
+
+        A sheet that EXISTS but fails to load is surfaced to the user (it would
+        otherwise silently turn every PO on it into "not found"). Sheets simply
+        absent from the workbook are normal — the cross-sheet PO search probes
+        several optional sheets — so those are only logged at debug level.
+        """
+        if sheet_name in self._existing_sheet_names():
+            logger.warning("Could not load sheet '%s': %s", sheet_name, error)
+            self.load_warnings.append(
+                f"Sheet '{sheet_name}' is in the workbook but could not be read "
+                f"({error}). PO matches against it are disabled — results may be "
+                f"incomplete."
+            )
+        else:
+            logger.debug("Sheet '%s' not present in workbook", sheet_name)
 
     @staticmethod
     def _normalize_column_name(col_name: object) -> str:
@@ -168,9 +198,12 @@ class ExcelReader:
 
     def find_po_record(self, po_number: str, sheet_name: str) -> Optional[PORecord]:
         """
-        Find a PO record in a specific sheet using substring matching.
+        Find a PO record in a specific sheet by exact PO match.
 
-        A cell like '\\nCJL408\\n' will match PO 'CJL408' via contains match.
+        A PO cell may carry surrounding newlines (e.g. '\\nCJL408\\n') or list
+        several POs on separate lines; each line is compared exactly to the
+        query. Exact (not substring) matching prevents a short/truncated PO such
+        as 'OT040' from matching a different longer PO like 'OT0402'.
         """
         if not po_number or not str(po_number).strip():
             return None
@@ -184,9 +217,11 @@ class ExcelReader:
 
         po_clean = str(po_number).strip().upper()
 
-        # Substring/contains matching: search for PO value within cell content
-        po_normalized = df["PO"].fillna("").astype(str).str.upper()
-        mask = po_normalized.str.contains(po_clean, na=False, regex=False)
+        def _cell_matches(cell: object) -> bool:
+            # Split on newlines so a wrapped/multi-PO cell still matches exactly.
+            return po_clean in [line.strip() for line in str(cell).upper().split("\n")]
+
+        mask = df["PO"].fillna("").astype(str).apply(_cell_matches)
         matches = df[mask]
 
         if matches.empty:

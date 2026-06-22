@@ -32,8 +32,8 @@ Process example PDFs in `example-files/` against the test Excel file (`Maintenan
 ## Key Patterns
 
 - **Generic extraction** — The generic extractor uses multi-pattern matching (regex cascades) to handle any supplier format. No supplier-name checks in extraction logic — patterns match field labels and text structure, not supplier identity.
-- **Multi-strategy PO matching** — Three strategies tried in order: exact PO match, invoice number search, then fuzzy multi-field matching (store + amount + supplier).
-- **Excel header detection** — Headers are at row 5-6, not row 0. The reader scans for the header row dynamically by looking for known column names (PO, STORE, etc.).
+- **Multi-strategy PO matching** — Three strategies tried in order: exact PO match (cross-sheet via `find_po_record_any_sheet`), invoice number search, then fuzzy multi-field matching (store + amount + supplier). Fuzzy only runs for invoices with **no PO of their own** — a stated-but-missing PO reports "not found" rather than matching a different order. PO matching is exact-per-line, not substring (so `OT040` won't match `OT0402`).
+- **Excel header detection** — Headers are at row 5-6, not row 0. The reader scans the first 20 rows for a cell whose value is exactly `PO` and uses that row as the header. A sheet that exists but fails to load is surfaced via `ExcelReader.load_warnings` (shown as a UI banner), since it would otherwise silently make every PO on it "not found".
 - **Billing city exclusion** — When extracting store/delivery address, known billing HQ cities (e.g. "Dorking" for Menkind) and duplicate cities are excluded to find the actual delivery location.
 - **Sheet selection** — Supplier name maps to the correct Excel sheet (e.g. CJL -> "CJL", Amazon -> "ORDERS", generic -> "OTHER").
 - **Nominal code mapping** — Persisted in `data/nominal_codes.json`, loaded into session state on startup. The sidebar expander shows all mappings and supports add/remove with save-to-disk. Codes are 4-digit numbers only (e.g. `7820`, not `7820 Stores Repairs`).

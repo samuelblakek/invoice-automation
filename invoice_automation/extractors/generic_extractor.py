@@ -244,10 +244,11 @@ class GenericExtractor(BaseExtractor):
             r"Total\s+(?:ex|before|excl)\w*\s+VAT\s*:?\s*£?\s*([\d,]+\.?\d*)",
             # "Total Net" with currency
             r"Total\s+Net\s*:?\s*£?\s*([\d,]+\.?\d*)",
-            # "Net" standalone with amount (broad — last resort)
-            r"\bNet\b\s*:?\s*£?\s*([\d,]+\.?\d*)",
-            # Look for "NET" followed by amount (broader pattern)
-            r"\bNET\b\s+([\d,]+\.?\d*)",
+            # "Net" standalone with amount (broad — last resort). Require a
+            # decimal so payment terms like "Net 30 days" can't become net=30.
+            r"\bNet\b\s*:?\s*£?\s*([\d,]+\.\d{2})",
+            # Look for "NET" followed by amount (broader pattern, decimal required)
+            r"\bNET\b\s+£?([\d,]+\.\d{2})",
         ]
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
@@ -273,8 +274,9 @@ class GenericExtractor(BaseExtractor):
             # "£26.46" preceded by VAT rate on same line: "20.00% £26.46"
             r"20\.00%\s+£([\d,]+\.\d{2})",
             # "VAT 202.00" on same line — must have decimal digits.
-            # Negative lookbehind avoids matching the net line "Total ex VAT 115.00".
-            r"(?<!ex )\bVAT\b\s+£?([\d,]+\.\d{2})",
+            # Negative lookbehinds avoid matching the net line "Total ex VAT
+            # 115.00" and its variants ("exc", "excl", "ex.").
+            r"(?<!ex )(?<!exc )(?<!excl )(?<!ex\. )\bVAT\b\s+£?([\d,]+\.\d{2})",
         ]
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)

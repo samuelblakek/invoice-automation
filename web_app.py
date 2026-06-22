@@ -4,7 +4,9 @@ Simple drag-and-drop interface for invoice processing
 """
 
 import base64
+import html
 import json
+import logging
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -20,11 +22,14 @@ from invoice_automation.extractors import (
     APSExtractor,
     GenericExtractor,
 )
+from invoice_automation.extractors.base_extractor import PDFExtractionError
 from invoice_automation.models import ValidationResult
 from invoice_automation.utils.supplier_registry import (
     identify_supplier as identify_supplier_from_text,
 )
 from invoice_automation.reports.report_generator import ReportGenerator
+
+logger = logging.getLogger(__name__)
 import pdfplumber
 
 
@@ -300,15 +305,24 @@ button[kind="secondary"]:hover {
 
 
 def inv_card_html(inv, po=None, extra="", accent="var(--border-subtle)"):
-    """Generate HTML for an invoice card."""
+    """Generate HTML for an invoice card.
+
+    All invoice/PO fields are HTML-escaped: they originate from untrusted
+    supplier PDFs (and uploaded filenames), so unescaped values rendered via
+    st.markdown(unsafe_allow_html=True) would be a stored-XSS vector. `extra`
+    is pre-built HTML and must already be escaped by the caller.
+    """
+    e = html.escape
     po_line = (
-        f'<div class="inv-detail">PO: {po.po_number}  |  {po.store}</div>' if po else ""
+        f'<div class="inv-detail">PO: {e(str(po.po_number))}  |  {e(str(po.store))}</div>'
+        if po
+        else ""
     )
     return f"""<div class="inv-card" style="--card-accent:{accent}">
-        <div class="inv-num">{inv.invoice_number}</div>
-        <div class="inv-supplier">{inv.supplier_name}</div>
+        <div class="inv-num">{e(str(inv.invoice_number))}</div>
+        <div class="inv-supplier">{e(str(inv.supplier_name))}</div>
         <div class="inv-amount">&pound;{inv.net_amount:.2f}</div>
-        <div class="inv-detail">Store: {inv.store_location}</div>
+        <div class="inv-detail">Store: {e(str(inv.store_location))}</div>
         {po_line}{extra}
     </div>"""
 
@@ -682,7 +696,9 @@ if process_button and all_files_uploaded:
             pdf_dir.mkdir()
 
             for pdf in invoice_pdfs:
-                pdf_path = pdf_dir / pdf.name
+                # Use only the basename of the uploaded filename so it can't
+                # escape the temp directory via path components.
+                pdf_path = pdf_dir / Path(pdf.name).name
                 pdf_path.write_bytes(pdf.read())
 
             # Save Excel files
@@ -709,13 +725,32 @@ if process_button and all_files_uploaded:
                     invoice = extract_invoice(pdf_file)
                     result = validator.validate(invoice)
                     results.append(result)
-                except Exception as e:
+                except PDFExtractionError as e:
+                    # Expected, user-actionable: the PDF couldn't be parsed.
                     error_msg = f"Could not read '{pdf_file.name}': {e}"
-                    result = ValidationResult.create_error(str(pdf_file), error_msg)
-                    results.append(result)
+                    results.append(
+                        ValidationResult.create_error(str(pdf_file), error_msg)
+                    )
+                except Exception:
+                    # Unexpected (bug, pandas/openpyxl error, etc.). Log the full
+                    # traceback and surface it as distinct from a read failure so
+                    # a code bug isn't silently mislabelled as a bad PDF.
+                    logger.exception("Unexpected error processing %s", pdf_file.name)
+                    error_msg = (
+                        f"Unexpected error processing '{pdf_file.name}' — this is "
+                        f"likely a bug, not a bad PDF. Check the server logs."
+                    )
+                    results.append(
+                        ValidationResult.create_error(str(pdf_file), error_msg)
+                    )
 
             progress_bar.empty()
             status_text.empty()
+
+            # Surface any maintenance sheets that exist but failed to load — they
+            # would otherwise silently turn every PO on them into "not found".
+            for sheet_warning in excel_reader.load_warnings:
+                st.warning(sheet_warning)
 
             # Look up nominal codes and warn on misses
             nominal_rows = st.session_state.get("nominal_mapping_rows", [])
@@ -809,7 +844,8 @@ if st.session_state.get("processed"):
         )
         for r in auto_results:
             warn_html = "".join(
-                f'<div class="inv-warning">⚠ {w}</div>' for w in r.warnings
+                f'<div class="inv-warning">⚠ {html.escape(str(w))}</div>'
+                for w in r.warnings
             )
             st.markdown(
                 inv_card_html(r.invoice, r.po_record, warn_html, accent="var(--green)"),
@@ -846,12 +882,12 @@ if st.session_state.get("processed"):
 
                 for error in result.errors:
                     st.markdown(
-                        f"<span style='color:var(--amber);font-size:0.78rem'>⚠ {error}</span>",
+                        f"<span style='color:var(--amber);font-size:0.78rem'>⚠ {html.escape(str(error))}</span>",
                         unsafe_allow_html=True,
                     )
                 for warning in result.warnings:
                     st.markdown(
-                        f"<span style='color:var(--amber);font-size:0.78rem'>⚠ {warning}</span>",
+                        f"<span style='color:var(--amber);font-size:0.78rem'>⚠ {html.escape(str(warning))}</span>",
                         unsafe_allow_html=True,
                     )
 
@@ -878,7 +914,8 @@ if st.session_state.get("processed"):
         )
         for result in failed_results:
             err_html = "".join(
-                f'<div class="inv-error">{e}</div>' for e in result.errors
+                f'<div class="inv-error">{html.escape(str(e))}</div>'
+                for e in result.errors
             )
             if result.invoice:
                 st.markdown(
