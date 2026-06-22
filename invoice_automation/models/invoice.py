@@ -47,6 +47,28 @@ class Invoice:
     pdf_path: str
     extracted_fields: Dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        # An invoice with no number is meaningless — make it unrepresentable
+        # rather than relying on each extractor to check.
+        if not self.invoice_number or not str(self.invoice_number).strip():
+            raise ValueError("Invoice.invoice_number must be a non-empty string")
+        # Lock the "money is Decimal" invariant at the boundary so a stray
+        # float/str/int from a caller can't break amount comparisons downstream.
+        for name in ("net_amount", "vat_amount", "total_amount"):
+            value = getattr(self, name)
+            if not isinstance(value, Decimal):
+                setattr(self, name, Decimal(str(value)))
+
+    @property
+    def has_po(self) -> bool:
+        """True when the invoice carries a usable (non-blank) PO number."""
+        return bool(self.po_number and str(self.po_number).strip())
+
+    @property
+    def has_store(self) -> bool:
+        """True when the invoice carries a usable (non-blank) store location."""
+        return bool(self.store_location and str(self.store_location).strip())
+
     def __repr__(self) -> str:
         return (
             f"Invoice(invoice_number='{self.invoice_number}', "

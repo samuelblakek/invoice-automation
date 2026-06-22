@@ -4,6 +4,7 @@ Simple drag-and-drop interface for invoice processing
 """
 
 import base64
+import hmac
 import html
 import json
 import logging
@@ -488,6 +489,46 @@ def extract_invoice(pdf_path: Path):
 st.set_page_config(page_title="Invoice Automation", page_icon="📄", layout="wide")
 
 st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
+
+
+def _check_password() -> bool:
+    """Gate the app behind a shared access password.
+
+    The password is read from Streamlit secrets (key ``app_password``). To enable
+    the gate on Streamlit Community Cloud, add it under Manage app → Settings →
+    Secrets:
+
+        app_password = "your-secret-here"
+
+    If no password is configured (e.g. local development), the app is open. The
+    comparison is constant-time. This is a lightweight shared-secret gate; for
+    per-user identity, migrate to ``st.login`` (OIDC) later.
+    """
+    try:
+        expected = st.secrets.get("app_password")
+    except Exception:
+        expected = None
+
+    if not expected:
+        return True  # No password configured — app is open (local/dev).
+    if st.session_state.get("_authenticated"):
+        return True
+
+    st.markdown("### 🔒 Invoice Automation")
+    st.caption("Enter the access password to continue.")
+    with st.form("auth_form"):
+        password = st.text_input("Password", type="password")
+        submitted = st.form_submit_button("Enter")
+    if submitted:
+        if hmac.compare_digest(str(password), str(expected)):
+            st.session_state["_authenticated"] = True
+            st.rerun()
+        st.error("Incorrect password.")
+    return False
+
+
+if not _check_password():
+    st.stop()
 
 
 # ---------------------------------------------------------------------------

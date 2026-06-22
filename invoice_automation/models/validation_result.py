@@ -63,10 +63,6 @@ class ValidationResult:
     invoice: Optional[Invoice]
     po_record: Optional[PORecord]
     validations: List[Validation] = field(default_factory=list)
-    is_valid: bool = False
-    can_auto_update: bool = False
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
     pdf_path: str = ""
     nominal_code: str = ""
 
@@ -74,24 +70,40 @@ class ValidationResult:
         """Add a validation check result."""
         self.validations.append(validation)
 
-        if not validation.passed:
-            if validation.severity == ValidationSeverity.ERROR:
-                self.errors.append(validation.message)
-            elif validation.severity == ValidationSeverity.WARNING:
-                self.warnings.append(validation.message)
+    @property
+    def errors(self) -> List[str]:
+        """Messages of failed ERROR-severity checks (derived from validations)."""
+        return [
+            v.message
+            for v in self.validations
+            if not v.passed and v.severity == ValidationSeverity.ERROR
+        ]
 
-    def finalize(self) -> None:
-        """
-        Finalize validation result by determining overall status.
-        Sets is_valid and can_auto_update based on validation results.
-        """
-        has_errors = any(
+    @property
+    def warnings(self) -> List[str]:
+        """Messages of failed WARNING-severity checks (derived from validations)."""
+        return [
+            v.message
+            for v in self.validations
+            if not v.passed and v.severity == ValidationSeverity.WARNING
+        ]
+
+    @property
+    def is_valid(self) -> bool:
+        """True when there are no failed ERROR-severity checks."""
+        return not any(
             not v.passed and v.severity == ValidationSeverity.ERROR
             for v in self.validations
         )
 
-        self.is_valid = not has_errors
-        self.can_auto_update = self.is_valid and self.po_record is not None
+    @property
+    def can_auto_update(self) -> bool:
+        """Auto-updatable when valid and matched to a PO record."""
+        return self.is_valid and self.po_record is not None
+
+    def finalize(self) -> None:
+        """Deprecated no-op — status is now derived. Kept for call-site compatibility."""
+        return None
 
     @property
     def needs_review(self) -> bool:
@@ -132,14 +144,7 @@ class ValidationResult:
         cls, pdf_path: str, error_message: str, invoice: Optional[Invoice] = None
     ) -> "ValidationResult":
         """Create a validation result representing a critical error."""
-        result = cls(
-            invoice=invoice,
-            po_record=None,
-            pdf_path=pdf_path,
-            is_valid=False,
-            can_auto_update=False,
-            errors=[error_message],
-        )
+        result = cls(invoice=invoice, po_record=None, pdf_path=pdf_path)
         result.add_validation(
             Validation(
                 check_name="Critical Error",

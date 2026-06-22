@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-22 — Access password + model invariant refactor
+
+- **Auth:** the app is now gated behind a shared access password read from
+  Streamlit secrets (`app_password`). Set it under Manage app → Settings →
+  Secrets to enable; if unset (local dev) the app stays open. Constant-time
+  comparison. `.streamlit/secrets.toml.example` documents the key. For per-user
+  identity, `st.login` (OIDC) is the future upgrade path.
+- **Model invariants (type refactor):**
+  - `Invoice.__post_init__` rejects a blank `invoice_number` and coerces the
+    three money fields to `Decimal`, locking the "money is Decimal" invariant.
+  - Added `Invoice.has_po` / `has_store` helpers; `POMatcher` now uses them
+    instead of ad-hoc truthiness (a real £0 amount and whitespace-only fields
+    are handled consistently).
+  - `ValidationResult.is_valid` / `can_auto_update` / `errors` / `warnings` are
+    now derived `@property`s instead of stored fields written by `finalize()` —
+    removing the "read before finalize() returns a wrong False" hazard and the
+    errors/warnings desync. `finalize()` is now a no-op kept for compatibility.
+  - `PORecord.__post_init__` guards `row_index >= 0` (it addresses the row that
+    gets written back).
+  - Added `tests/test_models.py`.
+
 ## 2026-06-22 — Review fixes: correctness, security, error handling, tests
 
 Acting on a multi-agent code/security/app review:

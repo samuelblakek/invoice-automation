@@ -50,6 +50,12 @@ class PORecord:
     ticket_no: Optional[str] = None
     company_name: Optional[str] = None
 
+    def __post_init__(self) -> None:
+        # row_index addresses the spreadsheet row that gets written back, so a
+        # negative index would corrupt the wrong row — guard it.
+        if self.row_index < 0:
+            raise ValueError(f"PORecord.row_index must be >= 0, got {self.row_index}")
+
     def __repr__(self) -> str:
         return (
             f"PORecord(po_number='{self.po_number}', "

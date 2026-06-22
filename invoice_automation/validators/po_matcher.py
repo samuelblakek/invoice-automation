@@ -56,7 +56,7 @@ class POMatcher:
             return None, validations
 
         # Strategy 1: PO number match (mapped sheet first, then other maintenance sheets)
-        if invoice.po_number and invoice.po_number.strip():
+        if invoice.has_po:
             po_record = self.excel_reader.find_po_record_any_sheet(
                 invoice.po_number, sheet_name
             )
@@ -100,7 +100,7 @@ class POMatcher:
         # FOUND. We deliberately do not fuzzy-match to a *different* PO here —
         # guessing a different order risks invoicing against the wrong PO. Closest
         # candidates are shown only as a hint for manual lookup.
-        if invoice.po_number and invoice.po_number.strip():
+        if invoice.has_po:
             hint = ""
             if candidates:
                 hint = " Closest by store/amount: " + "; ".join(
@@ -154,11 +154,11 @@ class POMatcher:
             )
 
             match_fields = []
-            if invoice.store_location:
+            if invoice.has_store:
                 match_fields.append(f"store '{invoice.store_location}'")
-            if invoice.supplier_name:
+            if invoice.supplier_name and invoice.supplier_name.strip():
                 match_fields.append(f"supplier '{invoice.supplier_name}'")
-            if invoice.net_amount:
+            if invoice.net_amount > 0:
                 match_fields.append(f"amount £{invoice.net_amount:.2f}")
             fields_str = ", ".join(match_fields) if match_fields else "available fields"
             validations.append(
@@ -229,7 +229,7 @@ class POMatcher:
             )
 
         # Validate store name matches (fuzzy match)
-        if invoice.store_location and po_record.store:
+        if invoice.has_store and po_record.store:
             match_score = self.string_matcher.fuzzy_match_score(
                 invoice.store_location, po_record.store
             )
