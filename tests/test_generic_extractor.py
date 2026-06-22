@@ -56,6 +56,41 @@ def test_vat_does_not_match_ex_vat_net_line():
     assert _vat(text) != "115.00"
 
 
+def _store(text: str) -> str:
+    return GenericExtractor()._extract_store_location(text)
+
+
+def _po(text: str) -> str:
+    return GenericExtractor()._extract_po_number(text)
+
+
+def test_menkind_dash_store_single_word():
+    text = "Site Address:\nMenkind - Trafford\nUnit L78, Trafford Centre"
+    assert _store(text) == "Trafford"
+
+
+def test_menkind_dash_store_multi_word():
+    # Store names can be several words and must not be truncated.
+    assert _store("Menkind - Milton Keynes\nUnit 4") == "Milton Keynes"
+    assert _store("Menkind - Meadowhall Lower\nUnit 4") == "Meadowhall Lower"
+
+
+def test_store_not_taken_from_footer():
+    # The footer registration line must never be returned as the store.
+    text = "Menkind - Derby\nRegistered in England No: 14072087 VAT Reg No: 475706660"
+    assert "Registered in England" not in _store(text)
+
+
+def test_po_order_number_strips_ticket_prefix():
+    # "<ticket>/<PO>" — the PO is the part after the slash.
+    assert _po("Order number 123118/OT0402") == "OT0402"
+    assert _po("Order number 123352/LUX004") == "LUX004"
+
+
+def test_po_order_number_without_prefix():
+    assert _po("Order number LUX010") == "LUX010"
+
+
 def _total(text: str) -> str:
     return str(GenericExtractor()._extract_total_amount(text))
 

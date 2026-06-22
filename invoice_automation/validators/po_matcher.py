@@ -55,18 +55,20 @@ class POMatcher:
             )
             return None, validations
 
-        # Strategy 1: PO number match
+        # Strategy 1: PO number match (mapped sheet first, then other maintenance sheets)
         if invoice.po_number and invoice.po_number.strip():
-            po_record = self.excel_reader.find_po_record(invoice.po_number, sheet_name)
+            po_record = self.excel_reader.find_po_record_any_sheet(
+                invoice.po_number, sheet_name
+            )
             if po_record:
                 validations.append(
                     Validation(
                         check_name="PO Match",
                         passed=True,
                         expected=f"PO {invoice.po_number} found",
-                        actual=f"Found in {sheet_name} sheet (Strategy 1: PO match)",
+                        actual=f"Found in {po_record.sheet_name} sheet (Strategy 1: PO match)",
                         severity=ValidationSeverity.INFO,
-                        message=f"PO '{invoice.po_number}' found in sheet '{sheet_name}'",
+                        message=f"PO '{invoice.po_number}' found in sheet '{po_record.sheet_name}'",
                     )
                 )
                 self._add_post_match_validations(invoice, po_record, validations)

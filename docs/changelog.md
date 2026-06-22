@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-06-22 — Fix: ILUX store/PO extraction + cross-sheet PO matching
+
+Surfaced by a live test of the colleague's batch (all 5 ILUX invoices extracted
+but none matched). Three fixes so ILUX invoices match their PO records:
+
+- **Store** was read from the footer ("Registered in England No: …") because
+  ILUX's `Site Address` block comes through column-merged/garbled. Added a
+  high-priority `Menkind - <Store>` pattern (handles multi-word stores like
+  "Milton Keynes", "Meadowhall Lower").
+- **PO** kept the ticket prefix: "Order number 123352/LUX004" extracted as
+  `123352/LUX004`. Added an `Order number (?:<ticket>/)?<PO>` pattern → `LUX004`,
+  `OT0402`.
+- **Sheet routing:** ILUX POs span two sheets (`OT…` on OTHER, `LUX…` on the
+  `ILUX` sheet), but the matcher only searched the one mapped sheet — and the
+  `ILUX` sheet wasn't even in `load_maintenance_sheets`. Added `ILUX` to the
+  maintenance-sheet list and a cross-sheet exact-PO fallback
+  (`find_po_record_any_sheet`): try the mapped sheet first, then the others.
+
+Result: all 5 ILUX invoices match correctly (OT0402/Trafford, LUX010/Meadowhall,
+LUX004/Chelmsford, LUX009/Derby, LUX008/Milton Keynes), store match ≥77%. Added
+store/PO regression tests. Example invoices unchanged (stores now resolve to
+clean names; amounts still balance).
+
+Known, not code bugs: PO `CJL319` (286301) and `OT0329` (29120566) aren't in the
+2026 test workbook (older POs); the fuzzy fallback can still propose a wrong PO
+when the real one is absent, but flags it via a low store-match score.
+
 ## 2026-06-22 — Fix: hyphenated `INV-NNNNN` filenames failed extraction
 
 - **Bug:** Invoices named `INV-10801.pdf` (and similar) raised "Could not extract

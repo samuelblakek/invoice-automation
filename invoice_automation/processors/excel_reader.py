@@ -19,6 +19,20 @@ logger = logging.getLogger(__name__)
 class ExcelReader:
     """Reader for loading data from Excel workbooks."""
 
+    # Maintenance sheets that hold PO records. A supplier may have POs on more
+    # than one sheet (e.g. ILUX work appears on both 'OTHER' (OT-codes) and the
+    # dedicated 'ILUX' sheet (LUX-codes)), so cross-sheet PO lookup uses this list.
+    MAINTENANCE_SHEETS = [
+        "AAW NATIONAL (PANDA)",
+        "CJL",
+        "APS",
+        "ORDERS",
+        "OTHER",
+        "STORE MAINTENANCE",
+        "AURA AC",
+        "ILUX",
+    ]
+
     def __init__(self, maintenance_workbook_path: Path, cost_centre_path: Path = None):
         self.maintenance_workbook_path = Path(maintenance_workbook_path)
         self.cost_centre_path = Path(cost_centre_path) if cost_centre_path else None
@@ -121,23 +135,36 @@ class ExcelReader:
 
     def load_maintenance_sheets(self) -> Dict[str, pd.DataFrame]:
         """Load all maintenance PO sheets from the workbook."""
-        sheets_to_load = [
-            "AAW NATIONAL (PANDA)",
-            "CJL",
-            "APS",
-            "ORDERS",
-            "OTHER",
-            "STORE MAINTENANCE",
-            "AURA AC",
-        ]
-
         sheets = {}
-        for sheet_name in sheets_to_load:
+        for sheet_name in self.MAINTENANCE_SHEETS:
             df = self._read_sheet_with_header_detection(sheet_name)
             if df is not None:
                 sheets[sheet_name] = df
 
         return sheets
+
+    def find_po_record_any_sheet(
+        self, po_number: str, preferred_sheet: Optional[str] = None
+    ) -> Optional[PORecord]:
+        """
+        Find a PO record across maintenance sheets, trying the preferred sheet first.
+
+        A supplier's POs can be split across sheets (e.g. ILUX OT-codes live on
+        'OTHER' while LUX-codes live on the 'ILUX' sheet), so when the mapped sheet
+        doesn't contain the PO we fall back to the other maintenance sheets. The
+        returned record carries the sheet it was actually found in.
+        """
+        if not po_number or not str(po_number).strip():
+            return None
+
+        search_order = [preferred_sheet] if preferred_sheet else []
+        search_order += [s for s in self.MAINTENANCE_SHEETS if s != preferred_sheet]
+
+        for sheet_name in search_order:
+            record = self.find_po_record(po_number, sheet_name)
+            if record:
+                return record
+        return None
 
     def find_po_record(self, po_number: str, sheet_name: str) -> Optional[PORecord]:
         """

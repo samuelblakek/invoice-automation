@@ -149,6 +149,9 @@ class GenericExtractor(BaseExtractor):
         """Extract PO number with validation."""
         # Strategy 1: Look for PO reference fields with the actual PO after them
         po_field_patterns = [
+            # "Order number 123118/OT0402" or "Order number LUX010" — the real PO
+            # is the code after an optional "<ticket>/" prefix (Menkind/ILUX format).
+            r"Order\s+number\s+(?:\d+/)?([A-Z]{2,4}\d{3,6})",
             # "P.O. OT0363" → extract "OT0363" (the part after P.O.)
             r"P\.?O\.?\s+([A-Z]{2,4}\d{3,6})",
             # "Order Number: PO54047"
@@ -318,6 +321,15 @@ class GenericExtractor(BaseExtractor):
 
     def _extract_store_location(self, text: str) -> str:
         """Extract store/site name from invoice text using generic patterns."""
+        # 0. "Menkind - <Store>" — the explicit site label on Menkind invoices
+        #    (e.g. ILUX "Menkind - Trafford", "Menkind - Milton Keynes"). The store
+        #    name may be several words; capture to end of line / before an amount.
+        match = re.search(r"Menkind\s*-\s*([A-Za-z][A-Za-z'’ ]+?)\s*(?:£|\d|\n|$)", text)
+        if match:
+            store = match.group(1).strip()
+            if store and len(store) > 2:
+                return store
+
         # 1. Explicit "Site Address" section — last line is usually the city
         match = re.search(
             r"SITE\s+ADDRESS:\s*(.*?)(?:Site\s+Ref|Order\s+No|$)",
