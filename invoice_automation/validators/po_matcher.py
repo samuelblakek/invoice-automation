@@ -93,109 +93,111 @@ class POMatcher:
                 self._add_post_match_validations(invoice, po_record, validations)
                 return po_record, validations
 
-        # Strategy 3: Fuzzy multi-field match
         candidates = self.excel_reader.find_po_candidates(sheet_name, invoice)
 
-        if candidates:
-            best_record, best_score = candidates[0]
-
-            if best_score >= self.FUZZY_MATCH_THRESHOLD:
-                match_details = f"score={best_score:.1f}"
-                if not invoice.po_number:
-                    match_details += ", no PO on invoice"
-
-                validations.append(
-                    Validation(
-                        check_name="PO Match",
-                        passed=True,
-                        expected="Matching PO record",
-                        actual=f"Found PO '{best_record.po_number}' in {sheet_name} (Strategy 3: fuzzy match, {match_details})",
-                        severity=ValidationSeverity.WARNING
-                        if best_score < 60
-                        else ValidationSeverity.INFO,
-                        message=f"Fuzzy matched to PO '{best_record.po_number}' in '{sheet_name}' (store='{best_record.store}', score={best_score:.1f})",
-                    )
+        # If the invoice states a PO but neither the exact-PO search (Strategy 1)
+        # nor the invoice-number search (Strategy 2) found it, report it as NOT
+        # FOUND. We deliberately do not fuzzy-match to a *different* PO here —
+        # guessing a different order risks invoicing against the wrong PO. Closest
+        # candidates are shown only as a hint for manual lookup.
+        if invoice.po_number and invoice.po_number.strip():
+            hint = ""
+            if candidates:
+                hint = " Closest by store/amount: " + "; ".join(
+                    f"PO '{c[0].po_number}' store='{c[0].store}'" for c in candidates[:3]
                 )
-
-                if not invoice.po_number:
-                    match_fields = []
-                    if invoice.store_location:
-                        match_fields.append(f"store '{invoice.store_location}'")
-                    if invoice.supplier_name:
-                        match_fields.append(f"supplier '{invoice.supplier_name}'")
-                    if invoice.net_amount:
-                        match_fields.append(f"amount £{invoice.net_amount:.2f}")
-                    fields_str = (
-                        ", ".join(match_fields) if match_fields else "available fields"
-                    )
-                    validations.append(
-                        Validation(
-                            check_name="PO Number Warning",
-                            passed=False,
-                            expected="PO number on invoice",
-                            actual="No PO found on invoice",
-                            severity=ValidationSeverity.WARNING,
-                            message=f"No PO number on invoice — matched to PO '{best_record.po_number}' using {fields_str}",
-                        )
-                    )
-
-                self._add_post_match_validations(invoice, best_record, validations)
-                return best_record, validations
-
-            # Score 25-39: return best candidate as reviewable near-miss
-            if best_score >= 25:
-                candidate_info = "; ".join(
-                    f"PO '{c[0].po_number}' store='{c[0].store}' (score={c[1]:.1f})"
-                    for c in candidates[:3]
-                )
-                validations.append(
-                    Validation(
-                        check_name="PO Match",
-                        passed=False,
-                        expected="Matching PO record with score >= {:.0f}".format(
-                            self.FUZZY_MATCH_THRESHOLD
-                        ),
-                        actual=f"Best score {best_score:.1f}. Closest: {candidate_info}",
-                        severity=ValidationSeverity.ERROR,
-                        message=f"No confident match in sheet '{sheet_name}'. Closest: {candidate_info}. Check the PO exists and supplier/store are correct.",
-                    )
-                )
-                self._add_post_match_validations(invoice, best_record, validations)
-                return best_record, validations
-
-            # Score below 25 — truly no match
-            candidate_info = "; ".join(
-                f"PO '{c[0].po_number}' store='{c[0].store}' (score={c[1]:.1f})"
-                for c in candidates[:3]
-            )
             validations.append(
                 Validation(
                     check_name="PO Match",
                     passed=False,
-                    expected="Matching PO record with score >= {:.0f}".format(
-                        self.FUZZY_MATCH_THRESHOLD
-                    ),
-                    actual=f"Best score {best_score:.1f}. Closest: {candidate_info}",
+                    expected=f"PO '{invoice.po_number}' present in a maintenance sheet",
+                    actual="PO stated on the invoice was not found in any sheet",
                     severity=ValidationSeverity.ERROR,
-                    message=f"No confident match in sheet '{sheet_name}'. Closest: {candidate_info}. Check the PO exists and supplier/store are correct.",
+                    message=(
+                        f"PO '{invoice.po_number}' from the invoice was not found in any "
+                        f"maintenance sheet — not matched. Check the PO exists and is on "
+                        f"the right sheet.{hint}"
+                    ),
                 )
             )
             return None, validations
 
-        # No match at all
-        details = (
-            f"PO='{invoice.po_number}'" if invoice.po_number else "no PO on invoice"
+        # Strategy 3: Fuzzy multi-field match — only for invoices with NO PO of
+        # their own (scored on store + supplier + amount).
+        if not candidates:
+            validations.append(
+                Validation(
+                    check_name="PO Match",
+                    passed=False,
+                    expected=f"Match in {sheet_name} sheet",
+                    actual="No match found (no PO on invoice)",
+                    severity=ValidationSeverity.ERROR,
+                    message=f"No matching PO found in sheet '{sheet_name}' (no PO on invoice). Check the PO exists in the spreadsheet.",
+                )
+            )
+            return None, validations
+
+        best_record, best_score = candidates[0]
+
+        if best_score >= self.FUZZY_MATCH_THRESHOLD:
+            validations.append(
+                Validation(
+                    check_name="PO Match",
+                    passed=True,
+                    expected="Matching PO record",
+                    actual=f"Found PO '{best_record.po_number}' in {sheet_name} (Strategy 3: fuzzy match, score={best_score:.1f}, no PO on invoice)",
+                    severity=ValidationSeverity.WARNING
+                    if best_score < 60
+                    else ValidationSeverity.INFO,
+                    message=f"Fuzzy matched to PO '{best_record.po_number}' in '{sheet_name}' (store='{best_record.store}', score={best_score:.1f})",
+                )
+            )
+
+            match_fields = []
+            if invoice.store_location:
+                match_fields.append(f"store '{invoice.store_location}'")
+            if invoice.supplier_name:
+                match_fields.append(f"supplier '{invoice.supplier_name}'")
+            if invoice.net_amount:
+                match_fields.append(f"amount £{invoice.net_amount:.2f}")
+            fields_str = ", ".join(match_fields) if match_fields else "available fields"
+            validations.append(
+                Validation(
+                    check_name="PO Number Warning",
+                    passed=False,
+                    expected="PO number on invoice",
+                    actual="No PO found on invoice",
+                    severity=ValidationSeverity.WARNING,
+                    message=f"No PO number on invoice — matched to PO '{best_record.po_number}' using {fields_str}",
+                )
+            )
+
+            self._add_post_match_validations(invoice, best_record, validations)
+            return best_record, validations
+
+        # Below the fuzzy threshold — surface the closest candidates.
+        candidate_info = "; ".join(
+            f"PO '{c[0].po_number}' store='{c[0].store}' (score={c[1]:.1f})"
+            for c in candidates[:3]
         )
         validations.append(
             Validation(
                 check_name="PO Match",
                 passed=False,
-                expected=f"Match in {sheet_name} sheet",
-                actual=f"No match found ({details})",
+                expected="Matching PO record with score >= {:.0f}".format(
+                    self.FUZZY_MATCH_THRESHOLD
+                ),
+                actual=f"Best score {best_score:.1f}. Closest: {candidate_info}",
                 severity=ValidationSeverity.ERROR,
-                message=f"No matching PO found in sheet '{sheet_name}' ({details}). Check the PO exists in the spreadsheet.",
+                message=f"No confident match in sheet '{sheet_name}' (no PO on invoice). Closest: {candidate_info}. Check the PO exists and supplier/store are correct.",
             )
         )
+
+        # Score 25-39: return best candidate as a reviewable near-miss; below 25,
+        # there is nothing worth surfacing.
+        if best_score >= 25:
+            self._add_post_match_validations(invoice, best_record, validations)
+            return best_record, validations
         return None, validations
 
     def _add_post_match_validations(

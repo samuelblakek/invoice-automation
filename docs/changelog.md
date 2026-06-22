@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-06-22 — Tighten fuzzy matching: stated-but-missing PO reports "not found"
+
+When an invoice states a PO that isn't in any maintenance sheet, the matcher no
+longer falls back to fuzzy-matching a *different* PO (which risked invoicing
+against the wrong order). `POMatcher` Strategy 3 fuzzy matching now runs only for
+invoices with **no PO of their own**; when an invoice has a PO that exact-match
+(Strategy 1) and invoice-number (Strategy 2) both miss, it reports
+"PO '<x>' was not found in any maintenance sheet — not matched", listing the
+closest store/amount candidates only as a manual-lookup hint. PO-less invoices
+keep the existing fuzzy behaviour.
+
+Also: removed `@st.cache_resource` from `get_extractors()` so extractor code
+changes take effect on every redeploy (the cache previously served stale
+extractor instances until a manual reboot).
+
 ## 2026-06-22 — Fix: ILUX store/PO extraction + cross-sheet PO matching
 
 Surfaced by a live test of the colleague's batch (all 5 ILUX invoices extracted
