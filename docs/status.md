@@ -1,49 +1,67 @@
 # Project Status
 
+_Last updated: 2026-06-23_
+
 ## Current State
 
-**Status:** Working — clean codebase, ready to resume
+**Status:** Live and operational — deployed on Streamlit Community Cloud at
+https://invoice-automation-sk.streamlit.app/ (auto-deploys from `main`).
 
-The invoice processing pipeline is operational. PDFs are extracted, matched against PO records, validated, and written back to the Maintenance PO spreadsheet with nominal codes populated automatically.
+The pipeline extracts invoice PDFs, matches them to PO records in the uploaded
+Maintenance PO workbook, validates amounts/authorisation, and writes the updated
+Excel back for download. Verified end-to-end on the live app with the colleague
+test batch: all 5 ILUX invoices auto-match; invoices whose stated PO is absent
+from the workbook correctly report "not found".
 
 ## What's Complete
 
 - PDF extraction (generic multi-pattern + legacy supplier-specific extractors)
-- PO matching (exact → invoice number search → fuzzy multi-field)
-- Excel read/write with dynamic header detection
-- Streamlit web app with three-column card UI (Matched / Review / Failed)
-- Confirmation flow for near-miss invoices
-- Nominal code mapping — persisted in `data/nominal_codes.json`, editable in sidebar, multi-code supplier support with work-type disambiguation
-- Warning system for missing PO, high-value invoices, unmapped nominal codes
-- Report generation (CSV summary, text report)
-- Excel output with highlighted processed rows
+- PO matching: exact (cross-sheet) → invoice-number → fuzzy (PO-less only)
+- Excel read/write with dynamic header detection; failed-sheet loads surfaced
+- Streamlit three-column card UI (Matched / Review / Failed), confirmation flow
+- Nominal code mapping (JSON-backed, sidebar-editable, multi-code disambiguation)
+- Amount validation: net+VAT==total reconciliation + PO cross-check (reviewable)
+- Security hardening: HTML-escaped cards (XSS), Excel formula-injection guard,
+  basename-only upload paths, specific exception handling + traceback logging
+- Access-password gate (code present; **inactive until the secret is set**)
+- Automated tests (standalone runner, no pytest framework):
+  `tests/test_generic_extractor.py`, `tests/test_matching.py`, `tests/test_models.py`
+- Report generation (CSV summary, text report); highlighted processed rows
 
-## Recent Session (2026-02-11)
+## Recent Session (2026-06-22 → 2026-06-23)
 
-Ran full code quality analysis (lint, tech debt, best practices, performance) and fixed all issues:
-- Created `utils/supplier_registry.py` — single source of truth for supplier identification (eliminates triplicated logic)
-- Added sheet caching to ExcelReader for performance
-- Removed 370+ lines of dead code across 6 utility/extractor files
-- Fixed type annotations throughout (any/object -> Optional[datetime], bare tuples -> parameterized, etc.)
-- Replaced print() with logging, added error handling to nominal code I/O
-- Removed unused dependencies (click, pyyaml)
-- All imports verified, ruff passes clean
+Resumed from a pause to fix a reported extraction failure, then ran a full
+multi-agent review and acted on it. Commits (newest first):
 
-Previous session focused on nominal code persistence and matching:
-- Moved nominal codes from session-state-only to JSON-file-backed storage
-- Removed cost centre file dependency
-- Fixed sidebar UI (replaced broken data_editor with compact list + controls)
-- Built smart matching: space-stripped comparison, first-word fallback, work-type scoring for multi-code suppliers
+- `4d93713` Track: enable access password on live app (deferred)
+- `4d08bb9` Access-password gate + model-invariant refactor (Invoice/PORecord
+  `__post_init__`, `has_po`/`has_store`, ValidationResult derived properties)
+- `ed6d0d5` Review fixes: amount reconciliation, XSS + formula-injection guards,
+  specific exception handling/logging, exact-PO matching, VAT/NET regex, tests
+- `923d5c2` Tighten fuzzy matching: stated-but-missing PO reports "not found"
+- `36e0d50` Stop caching extractor instances (stale code after redeploy)
+- `c6a0d6d` ILUX store/PO extraction + cross-sheet PO matching
+- `40c01d1` Invoice-number (`INV-` filenames) + amount/glyph extraction fixes
 
 ## To Resume
 
-1. `pip install -r requirements.txt` (if deps changed)
-2. `streamlit run web_app.py`
-3. Upload test PDFs from `example-files/` and a Maintenance PO spreadsheet
-4. See `tasks/todo.md` for possible future work
+1. App is live and auto-deploys from `main` — no local run needed to use it.
+2. Local dev: `pip install -r requirements.txt` then `streamlit run web_app.py`.
+3. Run tests: `.venv/Scripts/python.exe -m tests.test_generic_extractor`
+   (and `tests.test_matching`, `tests.test_models`).
+4. See `tasks/todo.md` — the top item (enable the access password) needs a
+   one-line secret added in Streamlit Cloud.
 
-## Known Limitations
+## Known Limitations / Open Items
 
-- New suppliers need entries in `utils/supplier_registry.py`, `SheetSelector.SUPPLIER_SHEET_MAP`, and the nominal code mapping in the sidebar
-- Work-type disambiguation relies on word overlap between mapping descriptions and invoice PDF text — very short descriptions may not differentiate well
-- No automated tests — verification is manual via the web app with example PDFs
+- **Access password is inactive** until `app_password` is set in Streamlit Cloud
+  secrets — the deployed app is currently open to anyone with the link.
+- New suppliers need entries in `utils/supplier_registry.py`, `SheetSelector`,
+  and the nominal-code mapping.
+- Parsing is regex/label-based on flattened pdfplumber text — new supplier
+  formats / merged-column layouts need new patterns (see CLAUDE.md gotchas).
+- `CJLExtractor` mis-reads VAT on `286301.pdf` (£20 vs £1,736.40) — pre-existing,
+  that invoice fails on PO-not-found anyway.
+- Amount fields remain `Decimal` (0 = zero/unread); a full `Optional[Decimal]`
+  migration was deliberately deferred.
+- Tests use a standalone runner; pytest is not installed/configured.
