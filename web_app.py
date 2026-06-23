@@ -45,23 +45,23 @@ GLOBAL_CSS = """
 html, body, [class*="css"], .stMarkdown, .stText,
 .stSelectbox, .stMultiSelect, .stRadio, .stCheckbox,
 h1, h2, h3, h4, h5, h6, p, div, label, input, textarea, button, a {
-    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    font-family: var(--font-primary) !important;
 }
 /* Apply Outfit to spans, but NOT inside expander summaries where icon fonts live */
 span {
-    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    font-family: var(--font-primary) !important;
 }
 /* Restore icon font for expander toggle arrows -- higher specificity beats the span rule */
 [data-testid="stExpander"] summary span,
 [data-testid="stExpander"] [data-testid="stMarkdownContainer"] + div span,
 details summary span {
-    font-family: 'Material Symbols Rounded', sans-serif !important;
+    font-family: var(--font-icon) !important;
 }
 /* Also restore for any standalone icon use */
 .material-symbols-rounded,
 [data-baseweb="icon"],
 [data-baseweb="icon"] * {
-    font-family: 'Material Symbols Rounded', sans-serif !important;
+    font-family: var(--font-icon) !important;
 }
 /* Restore icon font for Streamlit material icons (file uploader button, etc.) */
 [data-testid="stIconMaterial"],
@@ -70,21 +70,43 @@ details summary span {
 [data-testid="stFileUploaderDropzone"] span[data-testid*="Icon"] *,
 [data-testid="stFileUploader"] button span[data-testid*="Icon"],
 [data-testid="stFileUploader"] button span[data-testid*="Icon"] * {
-    font-family: 'Material Symbols Rounded', sans-serif !important;
+    font-family: var(--font-icon) !important;
 }
 
-/* ---------- Colour tokens (dark slate / navy) ---------- */
+/* ---------- Design tokens (single source of truth: design-system/SPEC.md) ----------
+   Every value in the rules below references a token here. The only raw values
+   permitted outside :root are 0 and the grain-overlay SVG data-URI. */
 :root {
-    --bg-primary:    #0F1923;
-    --bg-card:       rgba(255, 255, 255, 0.05);
-    --bg-card-hover: rgba(255, 255, 255, 0.08);
-    --bg-elevated:   rgba(255, 255, 255, 0.10);
+    /* Typography */
+    --font-primary: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-icon:    'Material Symbols Rounded', sans-serif;
+    --text-xs:   12px;
+    --text-sm:   13px;
+    --text-base: 14px;
+    --text-md:   15px;
+    --text-lg:   16px;
+    --text-2xl:  21px;
+    --weight-medium:   500;
+    --weight-semibold: 600;
+    --weight-bold:     700;
+    --line-tight: 1.3;
+    --line-body:  1.4;
+
+    /* Surface / text */
+    --bg-primary:          #0F1923;
+    --bg-card:             rgba(255, 255, 255, 0.05);
+    --bg-card-hover:       rgba(255, 255, 255, 0.08);
+    --bg-elevated:         rgba(255, 255, 255, 0.10);
+    --bg-card-solid:       rgba(22, 34, 49, 0.85);
+    --bg-card-solid-hover: rgba(26, 40, 56, 0.90);
     --border-subtle: rgba(255, 255, 255, 0.08);
     --border-medium: rgba(255, 255, 255, 0.15);
     --text-primary:  #E2E8F0;
     --text-secondary:#94A3B8;
-    --text-muted:    #64748B;
+    --text-muted:    #7C8BA1;   /* A11Y-1: was #64748B (3.42:1); now 4.70:1 on cards */
     --accent:        #E2E8F0;
+
+    /* Status (solid / 10% fill / 25% border) */
     --green:         #34D399;
     --green-bg:      rgba(52, 211, 153, 0.10);
     --green-border:  rgba(52, 211, 153, 0.25);
@@ -94,6 +116,49 @@ details summary span {
     --red:           #F87171;
     --red-bg:        rgba(248, 113, 113, 0.10);
     --red-border:    rgba(248, 113, 113, 0.25);
+
+    /* Primary action (near-white neutral) */
+    --btn-primary-bg:         #E2E8F0;
+    --btn-primary-bg-hover:   #FFFFFF;
+    --btn-primary-text:       #0F1923;
+    --btn-primary-text-hover: #000000;
+
+    /* Focus / interaction (A11Y-2) */
+    --ring:              #38BDF8;
+    --focus-ring-width:  2px;
+    --focus-ring-offset: 2px;
+    --disabled-opacity:  0.5;
+    --press-scale:       0.98;
+
+    /* Spacing (4px base) */
+    --space-1: 4px;  --space-2: 8px;  --space-3: 12px;
+    --space-4: 16px; --space-5: 24px; --space-6: 32px;
+
+    /* Borders & radius */
+    --border-width: 1px;
+    --border-style: solid;
+    --radius-sm: 8px;
+    --radius-md: 10px;
+    --card-accent-width: 3px;
+
+    /* Shadows */
+    --shadow-card:       0 4px 16px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.40), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+    /* Transitions */
+    --transition-fast:   0.15s;
+    --transition-easing: ease;
+
+    /* Layout & effects */
+    --sidebar-blur:     16px;
+    --sidebar-bg:       rgba(255, 255, 255, 0.03);
+    --sidebar-border:   rgba(255, 255, 255, 0.06);
+    --grain-opacity:    0.04;
+    --grain-tile:       200px;
+    --touch-target-min: 44px;
+    --glow-sky:         rgba(56, 189, 248, 0.06);
+    --glow-violet:      rgba(139, 92, 246, 0.04);
+    --bg-gradient-top:  #1A2A3A;
 }
 
 /* ---------- Hide Streamlit branding ---------- */
@@ -109,15 +174,15 @@ header[data-testid="stHeader"] button span,
 [data-testid="stSidebarCollapsedControl"] span,
 [data-testid="stSidebarCollapseButton"] button span,
 [data-testid="stBaseButton-headerNoPadding"] span {
-    font-family: 'Material Symbols Rounded', sans-serif !important;
+    font-family: var(--font-icon) !important;
 }
 
 /* ---------- Body background (layered gradients with colour glow) ---------- */
 .stApp {
     background:
-        radial-gradient(ellipse at 30% 20%, rgba(56, 189, 248, 0.06) 0%, transparent 50%),
-        radial-gradient(ellipse at 70% 60%, rgba(139, 92, 246, 0.04) 0%, transparent 50%),
-        radial-gradient(ellipse at 50% 0%, #1A2A3A 0%, #0F1923 60%) !important;
+        radial-gradient(ellipse at 30% 20%, var(--glow-sky) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 60%, var(--glow-violet) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 0%, var(--bg-gradient-top) 0%, var(--bg-primary) 60%) !important;
 }
 
 /* ---------- Noise / grain overlay ---------- */
@@ -127,79 +192,81 @@ header[data-testid="stHeader"] button span,
     inset: 0;
     pointer-events: none;
     z-index: 999;
-    opacity: 0.04;
+    opacity: var(--grain-opacity);
     background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='a' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23a)'/%3E%3C/svg%3E");
-    background-size: 200px;
+    background-size: var(--grain-tile);
 }
 
 /* ---------- Sidebar (frosted glass) ---------- */
 section[data-testid="stSidebar"] {
-    background: rgba(255, 255, 255, 0.03) !important;
-    backdrop-filter: blur(16px) !important;
-    -webkit-backdrop-filter: blur(16px) !important;
-    border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+    background: var(--sidebar-bg) !important;
+    backdrop-filter: blur(var(--sidebar-blur)) !important;
+    -webkit-backdrop-filter: blur(var(--sidebar-blur)) !important;
+    border-right: var(--border-width) var(--border-style) var(--sidebar-border) !important;
 }
 
 /* ---------- Invoice card (solid glass-like, no backdrop-filter to avoid scroll artefacts) ---------- */
 .inv-card {
-    background: rgba(22, 34, 49, 0.85);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-left: 3px solid var(--card-accent, rgba(255, 255, 255, 0.08));
-    border-radius: 10px;
-    padding: 1.1rem 1.4rem;
-    margin-bottom: 0.75rem;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    background: var(--bg-card-solid);
+    border: var(--border-width) var(--border-style) var(--border-subtle);
+    border-left: var(--card-accent-width) var(--border-style) var(--card-accent, var(--border-subtle));
+    border-radius: var(--radius-md);
+    padding: var(--space-4) var(--space-5);
+    margin-bottom: var(--space-3);
+    box-shadow: var(--shadow-card);
+    transition: border-color var(--transition-fast) var(--transition-easing),
+                background var(--transition-fast) var(--transition-easing),
+                box-shadow var(--transition-fast) var(--transition-easing);
 }
 .inv-card:hover {
-    background: rgba(26, 40, 56, 0.9);
-    border-color: rgba(255, 255, 255, 0.15);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    background: var(--bg-card-solid-hover);
+    border-color: var(--border-medium);
+    box-shadow: var(--shadow-card-hover);
 }
 .inv-card .inv-num {
-    font-weight: 700;
-    font-size: 0.95rem;
+    font-weight: var(--weight-bold);
+    font-size: var(--text-md);
     color: var(--text-primary);
 }
 .inv-card .inv-supplier {
     color: var(--text-secondary);
-    font-size: 0.85rem;
-    margin-top: 0.15rem;
+    font-size: var(--text-sm);
+    margin-top: var(--space-1);
 }
 .inv-card .inv-amount {
-    font-size: 1rem;
-    font-weight: 600;
+    font-size: var(--text-lg);
+    font-weight: var(--weight-semibold);
     color: var(--text-primary);
-    margin-top: 0.4rem;
+    margin-top: var(--space-1);
 }
 .inv-card .inv-detail {
     color: var(--text-muted);
-    font-size: 0.8rem;
-    margin-top: 0.2rem;
+    font-size: var(--text-sm);
+    margin-top: var(--space-1);
 }
 .inv-card .inv-error {
     color: var(--red);
-    font-size: 0.8rem;
-    margin-top: 0.3rem;
+    font-size: var(--text-sm);
+    margin-top: var(--space-1);
 }
 .inv-card .inv-warning {
     color: var(--amber);
-    font-size: 0.78rem;
-    margin-top: 0.4rem;
+    font-size: var(--text-xs);
+    margin-top: var(--space-1);
     padding-left: 1.2em;
     text-indent: -1.2em;
-    line-height: 1.4;
+    line-height: var(--line-body);
 }
 
 /* ---------- Column header pills ---------- */
 .col-header {
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 0.85rem;
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-sm);
+    font-weight: var(--weight-semibold);
+    font-size: var(--text-base);
     text-align: center;
-    margin-bottom: 1rem;
-    border: 1px solid;
+    margin-bottom: var(--space-4);
+    border: var(--border-width) var(--border-style);
 }
 .col-header-green  { background: var(--green-bg);  color: var(--green);  border-color: var(--green-border); }
 .col-header-amber  { background: var(--amber-bg);  color: var(--amber);  border-color: var(--amber-border); }
@@ -208,56 +275,59 @@ section[data-testid="stSidebar"] {
 /* ---------- Compact inline metrics ---------- */
 .inline-metrics {
     display: flex;
-    gap: 2rem;
-    margin-bottom: 1.5rem;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid var(--border-subtle);
+    gap: var(--space-6);
+    margin-bottom: var(--space-5);
+    padding: var(--space-3) 0;
+    border-bottom: var(--border-width) var(--border-style) var(--border-subtle);
 }
-.inline-metric { font-size: 0.875rem; color: var(--text-secondary); }
+.inline-metric { font-size: var(--text-base); color: var(--text-secondary); }
 .inline-metric strong {
     color: var(--text-primary);
-    font-size: 1rem;
-    font-weight: 700;
-    margin-right: 0.3rem;
+    font-size: var(--text-lg);
+    font-weight: var(--weight-bold);
+    margin-right: var(--space-1);
 }
 
 /* ---------- Section divider ---------- */
 .section-divider {
     border: none;
-    border-top: 1px solid var(--border-subtle);
-    margin: 2rem 0;
+    border-top: var(--border-width) var(--border-style) var(--border-subtle);
+    margin: var(--space-6) 0;
 }
 
-/* ---------- Button overrides ---------- */
+/* ---------- Button overrides ----------
+   !important is required here to win against Streamlit's own high-specificity
+   defaults (SPEC.md anti-pattern #7) -- but every VALUE is a token. */
 /* Primary buttons: warm neutral (white bg, dark text) */
 button[data-testid="stBaseButton-primary"],
 button[kind="primary"] {
-    background-color: #E2E8F0 !important;
-    border: 1px solid #E2E8F0 !important;
-    color: #0F1923 !important;
-    font-weight: 600 !important;
-    border-radius: 8px !important;
-    font-size: 0.85rem !important;
+    background-color: var(--btn-primary-bg) !important;
+    border: var(--border-width) var(--border-style) var(--btn-primary-bg) !important;
+    color: var(--btn-primary-text) !important;
+    font-weight: var(--weight-semibold) !important;
+    border-radius: var(--radius-sm) !important;
+    font-size: var(--text-base) !important;
     letter-spacing: 0.01em !important;
-    transition: background 0.15s ease !important;
+    min-height: var(--touch-target-min) !important;
+    transition: background var(--transition-fast) var(--transition-easing) !important;
 }
 button[data-testid="stBaseButton-primary"]:hover,
 button[kind="primary"]:hover {
-    background-color: #FFFFFF !important;
-    border-color: #FFFFFF !important;
-    color: #000000 !important;
+    background-color: var(--btn-primary-bg-hover) !important;
+    border-color: var(--btn-primary-bg-hover) !important;
+    color: var(--btn-primary-text-hover) !important;
 }
 
 /* Secondary buttons: ghost style */
 button[data-testid="stBaseButton-secondary"],
 button[kind="secondary"] {
     background-color: transparent !important;
-    border: 1px solid var(--border-medium) !important;
+    border: var(--border-width) var(--border-style) var(--border-medium) !important;
     color: var(--text-secondary) !important;
-    font-weight: 500 !important;
-    border-radius: 8px !important;
-    font-size: 0.85rem !important;
-    transition: all 0.15s ease !important;
+    font-weight: var(--weight-medium) !important;
+    border-radius: var(--radius-sm) !important;
+    font-size: var(--text-base) !important;
+    transition: all var(--transition-fast) var(--transition-easing) !important;
 }
 button[data-testid="stBaseButton-secondary"]:hover,
 button[kind="secondary"]:hover {
@@ -269,12 +339,12 @@ button[kind="secondary"]:hover {
 /* Reset button -- red destructive style (targeted via widget key) */
 .st-key-reset_app button {
     background-color: transparent !important;
-    border: 1px solid var(--red-border) !important;
+    border: var(--border-width) var(--border-style) var(--red-border) !important;
     color: var(--red) !important;
-    font-weight: 600 !important;
-    border-radius: 8px !important;
-    font-size: 0.85rem !important;
-    transition: all 0.15s ease !important;
+    font-weight: var(--weight-semibold) !important;
+    border-radius: var(--radius-sm) !important;
+    font-size: var(--text-base) !important;
+    transition: all var(--transition-fast) var(--transition-easing) !important;
 }
 .st-key-reset_app button:hover {
     background-color: var(--red-bg) !important;
@@ -284,17 +354,57 @@ button[kind="secondary"]:hover {
 
 /* Download buttons -- normalise height */
 [data-testid="stDownloadButton"] button {
-    border-radius: 8px !important;
-    font-weight: 600 !important;
-    min-height: 2.8rem !important;
+    border-radius: var(--radius-sm) !important;
+    font-weight: var(--weight-semibold) !important;
+    min-height: var(--touch-target-min) !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
 }
 [data-testid="stDownloadButton"] button p {
     margin: 0 !important;
-    line-height: 1.3 !important;
-    font-size: 0.82rem !important;
+    line-height: var(--line-tight) !important;
+    font-size: var(--text-base) !important;
+}
+
+/* ---------- Interaction states (A11Y-2) ---------- */
+/* Visible keyboard focus on every interactive element. :focus-visible (not
+   :focus) so it never fires on mouse click. */
+button:focus-visible,
+[data-baseweb="button"]:focus-visible,
+[data-testid="stDownloadButton"] button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[data-baseweb="select"] [role="button"]:focus-visible,
+[data-testid="stFileUploaderDropzone"]:focus-visible,
+summary:focus-visible {
+    outline: var(--focus-ring-width) var(--border-style) var(--ring) !important;
+    outline-offset: var(--focus-ring-offset) !important;
+}
+/* Destructive button gets a red ring to match its semantics */
+.st-key-reset_app button:focus-visible {
+    outline-color: var(--red) !important;
+}
+/* Press */
+button:active {
+    transform: scale(var(--press-scale)) !important;
+}
+/* Disabled treatment */
+button:disabled,
+button[disabled],
+[aria-disabled="true"] {
+    opacity: var(--disabled-opacity) !important;
+    cursor: not-allowed !important;
+}
+
+/* ---------- Reduced motion (A11Y-4) ---------- */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+    }
+    button:active { transform: none !important; }
 }
 </style>
 """
