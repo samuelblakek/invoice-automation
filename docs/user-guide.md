@@ -84,6 +84,9 @@ The invoice exceeds £200 but the quote isn't authorized in the spreadsheet. Get
 ### "Store name doesn't match"
 The invoice shows a different store name than the PO. This is usually safe to update manually — the fuzzy matching is being cautious.
 
+### "Store: Unknown"
+The automation couldn't confidently identify a Menkind store on the invoice (e.g. it only found a street/address, or a town that isn't a store), so it shows **"Store: Unknown"** rather than guessing. This is informational only — it does **not** cause a failure, and an invoice with a matching PO still lands in **Matched**. If a real store keeps showing as Unknown, its name may be missing from the recognised store list (a quick fix for the maintainer).
+
 ### Wrong amount displayed
 The automation extracts **net** (ex-VAT) amounts. If the amount looks wrong, check the PDF — look for "Net Total" or "Sub Total", not the total including VAT.
 

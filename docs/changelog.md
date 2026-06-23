@@ -1,5 +1,38 @@
 # Changelog
 
+## 2026-06-23 — Design system, UI refinement, accurate store extraction
+
+Shipped to `main` (live). Commits `f86d042`, `eafa65a`, `06a651c`.
+
+- **Design system:** added `design-system/SPEC.md` (canonical three-layer token
+  source of truth) and `design-system/REVIEW.md` (audit against the
+  `sk-design-system-framework`). Refactored `web_app.py` `GLOBAL_CSS` so every
+  value references a `:root` token (spacing/radius/shadow/typography/motion/
+  colour/focus) — the only raw values outside `:root` are `0` and the grain SVG.
+- **Accessibility (WCAG 2.2 AA):** muted text `#64748B` → `#7C8BA1` (was 3.42:1,
+  now 4.70:1 on cards); added `:focus-visible` rings (`--ring #38BDF8`),
+  `:active`/`:disabled` states, 44px touch targets, and a `prefers-reduced-motion`
+  block. `.streamlit/config.toml` colours unchanged (already in sync).
+- **Card UI refinement:**
+  - Wall-of-colour warnings/errors replaced by a compact `.inv-note` callout —
+    calm `--text-secondary` body text, status carried only by the ⚠ icon colour,
+    thin top divider (built by `inv_note_html()`).
+  - Thin **1px** low-contrast left accent (muted `--green-border`/`--red-border`)
+    instead of the chunky 3px saturated stripe.
+  - Validation messages rewritten to plain English; removed the unhelpful
+    "closest/similar PO" suggestions from not-found errors (matching is
+    direct-match only — the candidate scan still drives PO-less fuzzy matching).
+- **Store extraction accuracy:** `_extract_store_location` now returns a clean
+  Menkind store name or `""` — never a street/address fragment. Candidates are
+  validated against `_KNOWN_STORES` (62 canonical names sourced from the real
+  Maintenance PO workbook: data-sheet STORE columns + the two pivot tabs, "PB"
+  rows excluded, typos normalised), with a `_STORE_ALIASES` map for short forms
+  (e.g. `Silverburn` → `Glasgow Silverburn`). Longest-match-wins preserves real
+  branch qualifiers (Lower/Upper/Fort). A blank store renders "Store: Unknown ⚠"
+  and never fails a PO-matched invoice (the store check is gated on `has_store`).
+  Examples: "Kings Inch Road" → Braehead; Sunbelt's "Taunton" → "" (a delivery
+  town, not a Menkind store — no false guess). `test_generic_extractor` expanded.
+
 ## 2026-06-22 — Access password + model invariant refactor
 
 - **Auth:** the app is now gated behind a shared access password read from

@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-06-23 (ui-design-review branch)_
+_Last updated: 2026-06-23_
 
 ## Current State
 
@@ -17,8 +17,16 @@ from the workbook correctly report "not found".
 
 - PDF extraction (generic multi-pattern + legacy supplier-specific extractors)
 - PO matching: exact (cross-sheet) → invoice-number → fuzzy (PO-less only)
+- **Store extraction with allow-list validation** — returns a real Menkind store
+  name (validated against `_KNOWN_STORES`, 62 canonical names from the workbook)
+  or `""`; never a street/address guess. Blank shows "Store: Unknown" and never
+  fails a PO-matched invoice.
 - Excel read/write with dynamic header detection; failed-sheet loads surfaced
 - Streamlit three-column card UI (Matched / Review / Failed), confirmation flow
+- **Design system** — `design-system/SPEC.md` (canonical token source of truth) +
+  `design-system/REVIEW.md` (audit). `GLOBAL_CSS` fully tokenised; WCAG 2.2 AA.
+- **Refined card UI** — compact `.inv-note` callouts (calm text + coloured icon),
+  thin 1px card accent, plain-English validation messages.
 - Nominal code mapping (JSON-backed, sidebar-editable, multi-code disambiguation)
 - Amount validation: net+VAT==total reconciliation + PO cross-check (reviewable)
 - Security hardening: HTML-escaped cards (XSS), Excel formula-injection guard,
@@ -28,52 +36,44 @@ from the workbook correctly report "not found".
   `tests/test_generic_extractor.py`, `tests/test_matching.py`, `tests/test_models.py`
 - Report generation (CSV summary, text report); highlighted processed rows
 
-## Recent Session (2026-06-22 → 2026-06-23)
+## Recent Session (2026-06-23)
 
-Resumed from a pause to fix a reported extraction failure, then ran a full
-multi-agent review and acted on it. Commits (newest first):
+Design-system review + UI refinement + store-extraction accuracy. The store work
+ran in parallel (separate agent) against the real Maintenance PO workbook. All
+shipped to `main` and live. Commits (newest first):
 
-- `4d93713` Track: enable access password on live app (deferred)
-- `4d08bb9` Access-password gate + model-invariant refactor (Invoice/PORecord
-  `__post_init__`, `has_po`/`has_store`, ValidationResult derived properties)
-- `ed6d0d5` Review fixes: amount reconciliation, XSS + formula-injection guards,
-  specific exception handling/logging, exact-PO matching, VAT/NET regex, tests
-- `923d5c2` Tighten fuzzy matching: stated-but-missing PO reports "not found"
-- `36e0d50` Stop caching extractor instances (stale code after redeploy)
-- `c6a0d6d` ILUX store/PO extraction + cross-sheet PO matching
-- `40c01d1` Invoice-number (`INV-` filenames) + amount/glyph extraction fixes
+- `06a651c` Refine card UI (callouts, accent, messages) + accurate store extraction
+- `eafa65a` Note ui-design-review branch + design-system in status.md
+- `f86d042` Tokenise GLOBAL_CSS and add design-system spec (SPEC.md + REVIEW.md)
 
-## In-Progress Branch: `ui-design-review` (not merged)
-
-A UI design pass lives on the `ui-design-review` branch — **not on `main`**, so
-the live app is unaffected until a PR is merged. Commit `f86d042`:
-
-- Reviewed the UI against the `sk-design-system-framework` skill.
-- Refactored `web_app.py` `GLOBAL_CSS` so every value references a token
-  (spacing/radius/shadow/type/motion/focus), with visual parity to `main`.
-- Two WCAG AA fixes: muted text `#64748B`→`#7C8BA1` (contrast), and added
-  `:focus-visible` rings + `:active`/`:disabled` states + reduced-motion.
-- New `design-system/SPEC.md` (canonical three-layer token source of truth)
-  and `design-system/REVIEW.md` (the audit + findings).
-
-**Continue UI work here:** `git checkout ui-design-review`, pull token names
-from `design-system/SPEC.md` (add a `:root` token + spec entry for any new
-value rather than hardcoding), and use the QA checklist at the bottom of
-`SPEC.md` as a self-review. Open a PR to `main` only when ready to ship to live.
+Earlier session (2026-06-22 → 23): `4d93713` access-password tracking ·
+`4d08bb9` access-password gate + model-invariant refactor · `ed6d0d5` review
+fixes (amount/XSS/formula-injection/error-handling/tests) · `923d5c2` tighten
+fuzzy matching · `36e0d50` stop caching extractors · `c6a0d6d` ILUX store/PO +
+cross-sheet matching · `40c01d1` invoice-number + amount/glyph fixes.
 
 ## To Resume
 
 1. App is live and auto-deploys from `main` — no local run needed to use it.
-2. Local dev: `pip install -r requirements.txt` then `streamlit run web_app.py`.
+2. Local dev: `pip install -r requirements.txt` then `streamlit run web_app.py`
+   (or `.venv/Scripts/python.exe -m streamlit run web_app.py`).
 3. Run tests: `.venv/Scripts/python.exe -m tests.test_generic_extractor`
    (and `tests.test_matching`, `tests.test_models`).
-4. See `tasks/todo.md` — the top item (enable the access password) needs a
-   one-line secret added in Streamlit Cloud.
+4. UI work: `design-system/SPEC.md` is the token source of truth — add a `:root`
+   token + spec entry rather than hardcoding, and use the QA checklist at the
+   bottom of `SPEC.md` as a self-review.
+5. **Next feature on deck:** make the store list (`_KNOWN_STORES`) editable in-app
+   — JSON-backed sidebar like nominal codes (touches `web_app.py`; own branch).
+6. Still outstanding: enable the access password (one-line secret in Streamlit Cloud).
 
 ## Known Limitations / Open Items
 
 - **Access password is inactive** until `app_password` is set in Streamlit Cloud
   secrets — the deployed app is currently open to anyone with the link.
+- **Store list is static** — `_KNOWN_STORES` in `generic_extractor.py` is sourced
+  from the workbook but hardcoded. If a genuine store ever shows "Store: Unknown",
+  add/correct it there (one line); a real invoice town that isn't a Menkind store
+  correctly returns "" rather than guessing.
 - New suppliers need entries in `utils/supplier_registry.py`, `SheetSelector`,
   and the nominal-code mapping.
 - Parsing is regex/label-based on flattened pdfplumber text — new supplier
