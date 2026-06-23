@@ -321,18 +321,140 @@ class GenericExtractor(BaseExtractor):
     # Menkind HQ / billing address — never a store location
     _BILLING_CITIES = {"dorking"}
 
+    # Canonical Menkind store names, sourced from the actual store data in the
+    # Maintenance PO workbook — the union of the STORE columns across the data
+    # sheets (CJL, ILUX, STORE MAINTENANCE, OTHER, ORDERS, APS, AURA AC) and the
+    # CJL PIVOT / OTHER PIVOT row labels. This is the authoritative set the
+    # extracted store must match — a candidate is only accepted when it snaps to
+    # one of these, otherwise "" is returned ("if the app is not sure, no store
+    # is shown"). Multi-word branch names and qualifiers (Bluewater Lower/Upper,
+    # Meadowhall Upper, Glasgow Fort, Leeds White Rose) are first-class entries,
+    # so qualifiers are preserved naturally.
+    #
+    # The extractor runs independently of Excel loading (it takes no workbook and
+    # the live sheet may be open/locked), so the list is static. To add a store:
+    # add its canonical name below. Old "<store> PB" rows in the workbook are
+    # intentionally excluded, and obvious truncations/typos in the source data
+    # ("Bluewater U", "Glasgow Silverbur", "Gatehead", "Livingstone") were
+    # normalised to their correct names. Variant spellings that aren't canonical
+    # (e.g. bare "Silverburn") are handled via _STORE_ALIASES, not listed here.
+    # Display strings; matched case-insensitively.
+    _KNOWN_STORES = [
+        "Aberdeen", "Basingstoke", "Birmingham", "Blackpool", "Bluewater Lower",
+        "Bluewater Upper", "Braehead", "Brighton", "Bristol", "Bromley",
+        "Cambridge", "Cardiff", "Chelmsford", "Clarks Village", "Colchester",
+        "Cribbs", "Cwmbran", "Derby", "Doncaster", "Dundee", "Eastbourne",
+        "Edinburgh", "Edinburgh Fort", "Glasgow Buchanan", "Gateshead",
+        "Glasgow Braehead", "Glasgow Fort", "Glasgow Silverburn",
+        "Glasgow St Enoch", "Gloucester Quays", "Guildford", "Hanley",
+        "Hereford", "High Wycombe", "Hull", "Lakeside", "Leeds White Rose",
+        "Leicester", "Liverpool", "Livingston", "Maidstone", "Manchester",
+        "Meadowhall", "Meadowhall Lower", "Meadowhall Upper", "Merry Hill",
+        "Milton Keynes", "Newcastle", "Nottingham", "Oxford", "Peterborough",
+        "Portsmouth", "Reading", "Redditch", "Southampton",
+        "Staines", "Stratford", "Swansea", "Trafford", "Warrington", "Watford",
+        "Worcester",
+    ]
+
+    # Variant spellings that appear in source data or on invoices but are not the
+    # canonical store name. The matcher recognises the variant and returns the
+    # canonical form, so e.g. an invoice or PO row saying just "Silverburn"
+    # resolves to and displays as "Glasgow Silverburn". Keys are matched as
+    # whole-store candidates (lower-cased); values must be in _KNOWN_STORES.
+    _STORE_ALIASES = {
+        "silverburn": "Glasgow Silverburn",
+    }
+
+    @staticmethod
+    def _norm_words(s: str) -> list:
+        """Lower-cased word tokens of a string (letters/apostrophes only)."""
+        return re.findall(r"[a-z']+", s.lower())
+
+    def _clean_town_or_empty(self, candidate: str) -> str:
+        """Snap a raw candidate to a known store name, or return "".
+
+        A candidate is only accepted when it matches one of ``_KNOWN_STORES`` —
+        never a street, building, address blob, or company name. Steps:
+
+        1. Strip postcodes and surrounding punctuation/whitespace.
+        2. Exact (whole-string) match against a known store → return canonical.
+        3. Otherwise find the longest known store name that appears as a
+           contiguous run of words inside the candidate and snap to it. This
+           recovers the real store from a noisy/merged line such as
+           "Menkind Glasgow Fort Unit 4" → "Glasgow Fort", while a street blob
+           like "31 Eden Centre Newlands Meadow High Wycombe" only matches its
+           genuine store token if one is present.
+        4. No known store found → "". "If the app is not sure, no store is shown."
+
+        Longest-first matching means "Glasgow Fort" beats a bare "Glasgow" and
+        "Bluewater Upper" beats "Bluewater".
+        """
+        if not candidate:
+            return ""
+
+        # Strip UK postcodes and tidy punctuation/whitespace.
+        cleaned = re.sub(
+            r"[A-Z]{1,2}\d{1,2}[A-Z]?\s*\d[A-Z]{2}", "", candidate, flags=re.IGNORECASE
+        )
+        cleaned = cleaned.strip(" \t,.-–—/").strip()
+        cleaned = " ".join(cleaned.split())
+        if not cleaned:
+            return ""
+
+        words = self._norm_words(cleaned)
+        if not words:
+            return ""
+
+        # Matchable names as (canonical-display, word-tokens): the known stores
+        # plus alias variants (which carry their canonical display). Longest
+        # token-sequence first so the most specific branch (with qualifier) wins
+        # over a bare town.
+        matchable = [(s, self._norm_words(s)) for s in self._KNOWN_STORES]
+        matchable += [
+            (canonical, self._norm_words(alias))
+            for alias, canonical in self._STORE_ALIASES.items()
+        ]
+        known = sorted(matchable, key=lambda kv: len(kv[1]), reverse=True)
+
+        # 2. Exact whole-string match.
+        for canonical, ktokens in known:
+            if words == ktokens:
+                return canonical
+
+        # 3. Contiguous-subsequence match anywhere in the candidate.
+        for canonical, ktokens in known:
+            n = len(ktokens)
+            for i in range(len(words) - n + 1):
+                if words[i : i + n] == ktokens:
+                    return canonical
+
+        # 4. Not a known store → no store shown.
+        return ""
+
     def _extract_store_location(self, text: str) -> str:
-        """Extract store/site name from invoice text using generic patterns."""
+        """Extract the store name from invoice text using generic patterns.
+
+        Returns a clean store name, or "" when no known store is found. The
+        strategies below locate likely store text in priority order (the
+        explicit "Menkind - <Store>" label first, boilerplate last); every
+        candidate is passed through ``_clean_town_or_empty``, which only accepts
+        it if it snaps to a real store in ``_KNOWN_STORES``. Street fragments,
+        building names, address blobs, company words, and unknown towns are
+        therefore rejected rather than shown as a store.
+        """
         # 0. "Menkind - <Store>" — the explicit site label on Menkind invoices
-        #    (e.g. ILUX "Menkind - Trafford", "Menkind - Milton Keynes"). The store
-        #    name may be several words; capture to end of line / before an amount.
+        #    (e.g. ILUX "Menkind - Trafford", "Menkind - Milton Keynes"). The
+        #    most reliable signal: capture to end of line / before an amount.
+        #    Still validated, so a garbled merged label can't slip through.
         match = re.search(r"Menkind\s*-\s*([A-Za-z][A-Za-z'’ ]+?)\s*(?:£|\d|\n|$)", text)
         if match:
-            store = match.group(1).strip()
-            if store and len(store) > 2:
+            store = self._clean_town_or_empty(match.group(1))
+            if store:
                 return store
 
-        # 1. Explicit "Site Address" section — last line is usually the city
+        # 1. Explicit "Site Address" section — the store is usually the last
+        #    line. pdfplumber merges multi-column layouts, so a line can be a
+        #    street or a blob; store-set validation discards those.
         match = re.search(
             r"SITE\s+ADDRESS:\s*(.*?)(?:Site\s+Ref|Order\s+No|$)",
             text,
@@ -344,66 +466,85 @@ class GenericExtractor(BaseExtractor):
                 for line in match.group(1).strip().split("\n")
                 if line.strip()
             ]
-            if lines:
-                city = re.sub(r"[A-Z]{1,2}\d{1,2}\s*\d[A-Z]{2}", "", lines[-1]).strip()
-                if city and len(city) > 2 and not city.lower().startswith("unit"):
-                    return city
+            # Try lines from the bottom up — the town is usually last, but a
+            # street footer may sit below it; validation finds the real town.
+            for line in reversed(lines):
+                store = self._clean_town_or_empty(line)
+                if store:
+                    return store
 
         # 2. Explicit "Site Name" field — strip "Menkind" prefix if present
         match = re.search(
-            r"Site\s+Name\s*:\s*(?:Menkind\s+)?(\S+)", text, re.IGNORECASE
+            r"Site\s+Name\s*:\s*(?:Menkind\s+)?(.+)", text, re.IGNORECASE
         )
         if match:
-            store = match.group(1).strip()
-            if store and len(store) > 2:
+            store = self._clean_town_or_empty(match.group(1).split("\n")[0])
+            if store:
                 return store
 
         # 3. "X Shopping Centre" anywhere in text — extract X
-        match = re.search(r"(\w+)\s+Shopping\s+Centr", text, re.IGNORECASE)
+        match = re.search(r"([A-Za-z][A-Za-z' ]+?)\s+Shopping\s+Centr", text, re.IGNORECASE)
         if match:
-            return match.group(1).strip()
+            store = self._clean_town_or_empty(match.group(1))
+            if store:
+                return store
 
         # 4. "Units XX-XX, Location" in description text (OCR may read l for 1)
-        match = re.search(r"Units?\s+[\d\w]+-\d+\s*,\s*(\w+)", text, re.IGNORECASE)
+        match = re.search(r"Units?\s+[\d\w]+-\d+\s*,\s*([A-Za-z' ]+)", text, re.IGNORECASE)
         if match:
-            return match.group(1).strip()
+            store = self._clean_town_or_empty(match.group(1))
+            if store:
+                return store
 
         # 5. "Reference <name> - <location>" field
-        match = re.search(r"Reference\s+\w+\s*-\s*(\w+)", text, re.IGNORECASE)
+        match = re.search(r"Reference\s+\w+\s*-\s*([A-Za-z' ]+)", text, re.IGNORECASE)
         if match:
-            return match.group(1).strip()
+            store = self._clean_town_or_empty(match.group(1))
+            if store:
+                return store
 
-        # 6. City, Postcode pairs — pick first UNIQUE one that isn't the billing address
-        #    If a city appears multiple times it's likely the supplier's address, not the store
+        # 6. City, Postcode pairs — pick first UNIQUE one that isn't the billing
+        #    address. If a city appears multiple times it's likely the
+        #    supplier's address, not the store. Each is store-validated.
         city_matches = re.findall(
-            r"([A-Z][a-z]{2,}),\s*[A-Z]{1,2}\d{1,2}\s*\d[A-Z]{2}", text
+            r"([A-Z][A-Za-z' ]{2,}?),\s*[A-Z]{1,2}\d{1,2}[A-Z]?\s*\d[A-Z]{2}", text
         )
         city_counts = {}
         for c in city_matches:
-            city_counts[c] = city_counts.get(c, 0) + 1
-        delivery_cities = [
-            c
-            for c in city_matches
-            if c.lower() not in self._BILLING_CITIES and city_counts[c] == 1
-        ]
-        if delivery_cities:
-            return delivery_cities[0]
+            key = c.strip().lower()
+            city_counts[key] = city_counts.get(key, 0) + 1
+        for c in city_matches:
+            key = c.strip().lower()
+            if key in self._BILLING_CITIES or city_counts[key] != 1:
+                continue
+            store = self._clean_town_or_empty(c)
+            if store:
+                return store
 
-        # 7. "Menkind <StoreName>" — skip company words
-        match = re.search(r"Menkind\s+(\w+)", text, re.IGNORECASE)
+        # 7. "Menkind <StoreName>" — validate against known stores
+        match = re.search(r"Menkind\s+([A-Za-z][A-Za-z' ]+)", text)
         if match:
-            candidate = match.group(1).strip()
-            skip = {"limited", "ltd", "contract", "the", "atrium", "business"}
-            if candidate.lower() not in skip:
-                return candidate
+            store = self._clean_town_or_empty(match.group(1))
+            if store:
+                return store
 
         # 8. Compco-style embedded reference
         match = re.search(r"##VAR37\s+(.+?)##", text)
         if match:
-            return match.group(1).strip()
+            store = self._clean_town_or_empty(match.group(1))
+            if store:
+                return store
 
-        # Fallback: use StringMatcher
-        return self.string_matcher.extract_store_name(text) or ""
+        # 9. StringMatcher heuristic, validated against the known-store set.
+        #
+        # No whole-text scan beyond this: matching any known store name
+        # anywhere in the document grabs the supplier's own HQ address (e.g.
+        # Sunbelt Rentals' Warrington office in the footer) instead of the
+        # delivery store. The targeted strategies above search the site/delivery
+        # regions; if none yields a known store, return "" rather than guess.
+        return self._clean_town_or_empty(
+            self.string_matcher.extract_store_name(text) or ""
+        )
 
     def _extract_description(self, text: str) -> str:
         """Extract work description."""

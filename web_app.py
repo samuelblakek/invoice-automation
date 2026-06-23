@@ -139,7 +139,7 @@ details summary span {
     --border-style: solid;
     --radius-sm: 8px;
     --radius-md: 10px;
-    --card-accent-width: 3px;
+    --card-accent-width: 1px;   /* thin, low-contrast left status accent */
 
     /* Shadows */
     --shadow-card:       0 4px 16px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -244,19 +244,30 @@ section[data-testid="stSidebar"] {
     font-size: var(--text-sm);
     margin-top: var(--space-1);
 }
-.inv-card .inv-error {
-    color: var(--red);
+.inv-card .inv-detail.inv-store-unknown { color: var(--amber); }
+
+/* ---------- Card note -- compact callout for warnings / errors ----------
+   Calm body text (secondary) with status carried by the icon colour only --
+   not a saturated block of red/amber. A thin divider separates it from the
+   card body; stacked notes tuck under the first without extra dividers. */
+.inv-note {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: var(--border-width) var(--border-style) var(--border-subtle);
     font-size: var(--text-sm);
-    margin-top: var(--space-1);
-}
-.inv-card .inv-warning {
-    color: var(--amber);
-    font-size: var(--text-xs);
-    margin-top: var(--space-1);
-    padding-left: 1.2em;
-    text-indent: -1.2em;
     line-height: var(--line-body);
+    color: var(--text-secondary);
 }
+.inv-note + .inv-note {
+    margin-top: var(--space-2);
+    padding-top: 0;
+    border-top: none;
+}
+.inv-note .inv-note-icon { flex-shrink: 0; font-weight: var(--weight-bold); }
+.inv-note-warning .inv-note-icon { color: var(--amber); }
+.inv-note-error   .inv-note-icon { color: var(--red); }
 
 /* ---------- Column header pills ---------- */
 .col-header {
@@ -429,13 +440,30 @@ def inv_card_html(inv, po=None, extra="", accent="var(--border-subtle)"):
         if po
         else ""
     )
+    # Store unknown gets a subtle amber alert rather than being hidden -- but an
+    # unknown store never causes a failure on its own (PO match drives status).
+    store_line = (
+        f'<div class="inv-detail">Store: {e(str(inv.store_location))}</div>'
+        if inv.has_store
+        else '<div class="inv-detail inv-store-unknown">Store: Unknown &#9888;</div>'
+    )
     return f"""<div class="inv-card" style="--card-accent:{accent}">
         <div class="inv-num">{e(str(inv.invoice_number))}</div>
         <div class="inv-supplier">{e(str(inv.supplier_name))}</div>
         <div class="inv-amount">&pound;{inv.net_amount:.2f}</div>
-        <div class="inv-detail">Store: {e(str(inv.store_location))}</div>
+        {store_line}
         {po_line}{extra}
     </div>"""
+
+
+def inv_note_html(text: str, kind: str = "warning") -> str:
+    """Build a compact card-note callout (warning/error). `kind` sets the icon
+    colour only; body text stays calm. Text is HTML-escaped here."""
+    return (
+        f'<div class="inv-note inv-note-{kind}">'
+        f'<span class="inv-note-icon">&#9888;</span>'
+        f"<span>{html.escape(str(text))}</span></div>"
+    )
 
 
 def lookup_nominal_code(
@@ -994,12 +1022,11 @@ if st.session_state.get("processed"):
             unsafe_allow_html=True,
         )
         for r in auto_results:
-            warn_html = "".join(
-                f'<div class="inv-warning">⚠ {html.escape(str(w))}</div>'
-                for w in r.warnings
-            )
+            warn_html = "".join(inv_note_html(w, "warning") for w in r.warnings)
             st.markdown(
-                inv_card_html(r.invoice, r.po_record, warn_html, accent="var(--green)"),
+                inv_card_html(
+                    r.invoice, r.po_record, warn_html, accent="var(--green-border)"
+                ),
                 unsafe_allow_html=True,
             )
 
@@ -1027,20 +1054,18 @@ if st.session_state.get("processed"):
                 st.markdown(f"**{inv.invoice_number}**")
                 st.caption(f"{inv.supplier_name}")
                 st.markdown(f"**\u00a3{inv.net_amount:.2f}**")
-                st.caption(f"Store: {inv.store_location}")
+                if inv.has_store:
+                    st.caption(f"Store: {inv.store_location}")
+                else:
+                    st.markdown(
+                        "<span class='inv-store-unknown'>Store: Unknown &#9888;</span>",
+                        unsafe_allow_html=True,
+                    )
                 if po:
                     st.caption(f"PO: {po.po_number}  |  {po.store}")
 
-                for error in result.errors:
-                    st.markdown(
-                        f"<span style='color:var(--amber);font-size:0.78rem'>⚠ {html.escape(str(error))}</span>",
-                        unsafe_allow_html=True,
-                    )
-                for warning in result.warnings:
-                    st.markdown(
-                        f"<span style='color:var(--amber);font-size:0.78rem'>⚠ {html.escape(str(warning))}</span>",
-                        unsafe_allow_html=True,
-                    )
+                for note in (*result.errors, *result.warnings):
+                    st.markdown(inv_note_html(note, "warning"), unsafe_allow_html=True)
 
                 bc1, bc2 = st.columns(2)
                 with bc1:
@@ -1064,20 +1089,20 @@ if st.session_state.get("processed"):
             unsafe_allow_html=True,
         )
         for result in failed_results:
-            err_html = "".join(
-                f'<div class="inv-error">{html.escape(str(e))}</div>'
-                for e in result.errors
-            )
+            err_html = "".join(inv_note_html(e, "error") for e in result.errors)
             if result.invoice:
                 st.markdown(
                     inv_card_html(
-                        result.invoice, result.po_record, err_html, accent="var(--red)"
+                        result.invoice,
+                        result.po_record,
+                        err_html,
+                        accent="var(--red-border)",
                     ),
                     unsafe_allow_html=True,
                 )
             else:
                 st.markdown(
-                    f"""<div class="inv-card" style="--card-accent:var(--red)">
+                    f"""<div class="inv-card" style="--card-accent:var(--red-border)">
                     <div class="inv-num">Extraction Error</div>
                     {err_html}
                 </div>""",

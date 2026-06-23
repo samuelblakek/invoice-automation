@@ -93,7 +93,7 @@ class QuoteValidator:
                 expected="Quote reference AND authorization",
                 actual=f"Quote: {po_record.quote_over_200}, Auth: MISSING",
                 severity=ValidationSeverity.WARNING,
-                message=f"Over £200 — quote '{po_record.quote_over_200}' present but 'AUTHORISED' is empty (sheet '{sheet}', row {row})",
+                message=f"Over £200: quote {po_record.quote_over_200} is present but authorisation is blank ({sheet} sheet, row {row})",
             )
 
         # Case 3: No quote reference at all → WARN
@@ -104,7 +104,7 @@ class QuoteValidator:
                 expected="Quote reference and authorization",
                 actual="No quote reference found",
                 severity=ValidationSeverity.WARNING,
-                message=f"Over £200 — 'QUOTE OVER £200' and 'AUTHORISED' are both empty (sheet '{sheet}', row {row})",
+                message=f"Over £200: quote and authorisation are both blank ({sheet} sheet, row {row})",
             )
 
         # Case 4: Has authorization but no quote reference → WARN
@@ -114,5 +114,5 @@ class QuoteValidator:
             expected="Quote reference and authorization",
             actual=f"No quote ref, Auth: {po_record.authorized}",
             severity=ValidationSeverity.WARNING,
-            message=f"Over £200 — authorized by '{po_record.authorized}' but 'QUOTE OVER £200' is empty (sheet '{sheet}', row {row})",
+            message=f"Over £200: authorised by {po_record.authorized} but the quote reference is blank ({sheet} sheet, row {row})",
         )

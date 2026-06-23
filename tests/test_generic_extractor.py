@@ -70,15 +70,86 @@ def test_menkind_dash_store_single_word():
 
 
 def test_menkind_dash_store_multi_word():
-    # Store names can be several words and must not be truncated.
+    # Genuine multi-word store names must not be truncated.
     assert _store("Menkind - Milton Keynes\nUnit 4") == "Milton Keynes"
+    assert _store("Menkind - Leeds White Rose\nUnit 4") == "Leeds White Rose"
+
+
+def test_store_qualifier_preserved():
+    # Lower/Upper/Fort are real parts of a branch name (per the Maintenance PO
+    # workbook) and must be preserved, not stripped to the bare town.
+    assert _store("Menkind - Bluewater Lower\nUnit 4") == "Bluewater Lower"
     assert _store("Menkind - Meadowhall Lower\nUnit 4") == "Meadowhall Lower"
+    assert _store("Menkind - Meadowhall Upper\nUnit 4") == "Meadowhall Upper"
+    assert _store("Site Name : Menkind Glasgow Fort Unit 22") == "Glasgow Fort"
+
+
+def test_store_snaps_to_bare_store_when_branch_unknown():
+    # A qualifier that is not a real branch snaps to the bare store rather than
+    # inventing one. "Cardiff Upper" is not a real branch; bare "Cardiff" is a
+    # real store.
+    assert _store("Menkind - Cardiff Upper\nUnit 4") == "Cardiff"
+
+
+def test_store_alias_resolves_to_canonical():
+    # A variant spelling resolves to the canonical store name: bare "Silverburn"
+    # displays as "Glasgow Silverburn".
+    assert _store("Menkind - Silverburn\nUnit 4") == "Glasgow Silverburn"
+    assert _store("Menkind - Glasgow Silverburn\nUnit 4") == "Glasgow Silverburn"
 
 
 def test_store_not_taken_from_footer():
     # The footer registration line must never be returned as the store.
     text = "Menkind - Derby\nRegistered in England No: 14072087 VAT Reg No: 475706660"
-    assert "Registered in England" not in _store(text)
+    assert _store(text) == "Derby"
+
+
+def test_store_known_store_from_site_address():
+    # A real store on its own line is returned; the street line above is not.
+    text = "SITE ADDRESS:\nUnit 12 Kings Inch Road\nBraehead PA4 8XQ\nSite Ref 99"
+    assert _store(text) == "Braehead"
+
+
+def test_store_street_fragment_rejected():
+    # "Kings Inch Road" is a street, not a store — must not be returned. The
+    # known store on the unit line (Braehead) is returned instead.
+    text = "SITE ADDRESS:\nMenkind Braehead\nKings Inch Road\nSite Ref 99"
+    store = _store(text)
+    assert "Road" not in store
+    assert store == "Braehead"
+
+
+def test_store_unknown_town_returns_empty():
+    # A town that is not a Menkind store must yield "" — "if not sure, no
+    # store is shown". Taunton appears on some invoices but is not a store.
+    assert _store("SITE ADDRESS:\nSome Street\nTaunton TA1 1AA\nSite Ref 5") == ""
+
+
+def test_store_address_blob_returns_empty():
+    # A merged-column address blob with no known store token must return "" —
+    # the app shows no store rather than a street fragment.
+    text = "SITE ADDRESS:\n31 Eden Centre Newlands Meadow Faketon\nOrder No 5"
+    assert _store(text) == ""
+
+
+def test_store_skips_billing_company_line():
+    # The billing line "Menkind Ltd, RH4 1AA" must not yield "Ltd"; the real
+    # delivery store (Reading) wins.
+    text = "Invoice to Menkind Ltd, RH4 1AA\nDelivery 12 Long Lane, Reading, RG1 2AB"
+    assert _store(text) == "Reading"
+
+
+def test_store_menkind_dash_validated_store():
+    # The trusted Menkind - <Store> label yields clean store names, including
+    # multi-word ones.
+    assert _store("Menkind - Trafford\nUnit L78") == "Trafford"
+    assert _store("Menkind - High Wycombe\nUnit 4") == "High Wycombe"
+
+
+def test_store_bare_glasgow_is_not_a_store():
+    # Bare "Glasgow" is not a store (only the specific Glasgow branches are),
+    # so it must return "" rather than guessing.
+    assert _store("Menkind - Glasgow\nUnit 4") == ""
 
 
 def test_po_order_number_strips_ticket_prefix():

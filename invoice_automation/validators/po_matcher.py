@@ -101,11 +101,6 @@ class POMatcher:
         # guessing a different order risks invoicing against the wrong PO. Closest
         # candidates are shown only as a hint for manual lookup.
         if invoice.has_po:
-            hint = ""
-            if candidates:
-                hint = " Closest by store/amount: " + "; ".join(
-                    f"PO '{c[0].po_number}' store='{c[0].store}'" for c in candidates[:3]
-                )
             validations.append(
                 Validation(
                     check_name="PO Match",
@@ -114,9 +109,8 @@ class POMatcher:
                     actual="PO stated on the invoice was not found in any sheet",
                     severity=ValidationSeverity.ERROR,
                     message=(
-                        f"PO '{invoice.po_number}' from the invoice was not found in any "
-                        f"maintenance sheet — not matched. Check the PO exists and is on "
-                        f"the right sheet.{hint}"
+                        f"PO {invoice.po_number} not found in any maintenance sheet. "
+                        f"Check the PO exists and is on the right sheet."
                     ),
                 )
             )
@@ -175,11 +169,7 @@ class POMatcher:
             self._add_post_match_validations(invoice, best_record, validations)
             return best_record, validations
 
-        # Below the fuzzy threshold — surface the closest candidates.
-        candidate_info = "; ".join(
-            f"PO '{c[0].po_number}' store='{c[0].store}' (score={c[1]:.1f})"
-            for c in candidates[:3]
-        )
+        # Below the fuzzy threshold — no confident match.
         validations.append(
             Validation(
                 check_name="PO Match",
@@ -187,9 +177,9 @@ class POMatcher:
                 expected="Matching PO record with score >= {:.0f}".format(
                     self.FUZZY_MATCH_THRESHOLD
                 ),
-                actual=f"Best score {best_score:.1f}. Closest: {candidate_info}",
+                actual=f"Best score {best_score:.1f}, below threshold",
                 severity=ValidationSeverity.ERROR,
-                message=f"No confident match in sheet '{sheet_name}' (no PO on invoice). Closest: {candidate_info}. Check the PO exists and supplier/store are correct.",
+                message=f"No matching PO found in sheet '{sheet_name}' — there is no PO number on the invoice. Check the PO exists and the supplier and store are correct.",
             )
         )
 
