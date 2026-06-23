@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-06-23_
+_Last updated: 2026-06-23 (ui-design-review branch)_
 
 ## Current State
 
@@ -42,6 +42,24 @@ multi-agent review and acted on it. Commits (newest first):
 - `36e0d50` Stop caching extractor instances (stale code after redeploy)
 - `c6a0d6d` ILUX store/PO extraction + cross-sheet PO matching
 - `40c01d1` Invoice-number (`INV-` filenames) + amount/glyph extraction fixes
+
+## In-Progress Branch: `ui-design-review` (not merged)
+
+A UI design pass lives on the `ui-design-review` branch — **not on `main`**, so
+the live app is unaffected until a PR is merged. Commit `f86d042`:
+
+- Reviewed the UI against the `sk-design-system-framework` skill.
+- Refactored `web_app.py` `GLOBAL_CSS` so every value references a token
+  (spacing/radius/shadow/type/motion/focus), with visual parity to `main`.
+- Two WCAG AA fixes: muted text `#64748B`→`#7C8BA1` (contrast), and added
+  `:focus-visible` rings + `:active`/`:disabled` states + reduced-motion.
+- New `design-system/SPEC.md` (canonical three-layer token source of truth)
+  and `design-system/REVIEW.md` (the audit + findings).
+
+**Continue UI work here:** `git checkout ui-design-review`, pull token names
+from `design-system/SPEC.md` (add a `:root` token + spec entry for any new
+value rather than hardcoding), and use the QA checklist at the bottom of
+`SPEC.md` as a self-review. Open a PR to `main` only when ready to ship to live.
 
 ## To Resume
 
