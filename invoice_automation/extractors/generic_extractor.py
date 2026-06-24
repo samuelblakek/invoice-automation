@@ -11,6 +11,7 @@ import re
 from .base_extractor import BaseExtractor, PDFExtractionError
 from ..models import Invoice
 from ..utils.supplier_registry import identify_supplier as _identify_supplier_registry
+from ..utils import store_registry
 
 
 class GenericExtractor(BaseExtractor):
@@ -321,49 +322,19 @@ class GenericExtractor(BaseExtractor):
     # Menkind HQ / billing address — never a store location
     _BILLING_CITIES = {"dorking"}
 
-    # Canonical Menkind store names, sourced from the actual store data in the
-    # Maintenance PO workbook — the union of the STORE columns across the data
-    # sheets (CJL, ILUX, STORE MAINTENANCE, OTHER, ORDERS, APS, AURA AC) and the
-    # CJL PIVOT / OTHER PIVOT row labels. This is the authoritative set the
-    # extracted store must match — a candidate is only accepted when it snaps to
-    # one of these, otherwise "" is returned ("if the app is not sure, no store
-    # is shown"). Multi-word branch names and qualifiers (Bluewater Lower/Upper,
-    # Meadowhall Upper, Glasgow Fort, Leeds White Rose) are first-class entries,
-    # so qualifiers are preserved naturally.
-    #
-    # The extractor runs independently of Excel loading (it takes no workbook and
-    # the live sheet may be open/locked), so the list is static. To add a store:
-    # add its canonical name below. Old "<store> PB" rows in the workbook are
-    # intentionally excluded, and obvious truncations/typos in the source data
-    # ("Bluewater U", "Glasgow Silverbur", "Gatehead", "Livingstone") were
-    # normalised to their correct names. Variant spellings that aren't canonical
-    # (e.g. bare "Silverburn") are handled via _STORE_ALIASES, not listed here.
-    # Display strings; matched case-insensitively.
-    _KNOWN_STORES = [
-        "Aberdeen", "Basingstoke", "Birmingham", "Blackpool", "Bluewater Lower",
-        "Bluewater Upper", "Braehead", "Brighton", "Bristol", "Bromley",
-        "Cambridge", "Cardiff", "Chelmsford", "Clarks Village", "Colchester",
-        "Cribbs", "Cwmbran", "Derby", "Doncaster", "Dundee", "Eastbourne",
-        "Edinburgh", "Edinburgh Fort", "Glasgow Buchanan", "Gateshead",
-        "Glasgow Braehead", "Glasgow Fort", "Glasgow Silverburn",
-        "Glasgow St Enoch", "Gloucester Quays", "Guildford", "Hanley",
-        "Hereford", "High Wycombe", "Hull", "Lakeside", "Leeds White Rose",
-        "Leicester", "Liverpool", "Livingston", "Maidstone", "Manchester",
-        "Meadowhall", "Meadowhall Lower", "Meadowhall Upper", "Merry Hill",
-        "Milton Keynes", "Newcastle", "Nottingham", "Oxford", "Peterborough",
-        "Portsmouth", "Reading", "Redditch", "Southampton",
-        "Staines", "Stratford", "Swansea", "Trafford", "Warrington", "Watford",
-        "Worcester",
-    ]
+    def __init__(self):
+        """Load the recognised store list + aliases from the registry.
 
-    # Variant spellings that appear in source data or on invoices but are not the
-    # canonical store name. The matcher recognises the variant and returns the
-    # canonical form, so e.g. an invoice or PO row saying just "Silverburn"
-    # resolves to and displays as "Glasgow Silverburn". Keys are matched as
-    # whole-store candidates (lower-cased); values must be in _KNOWN_STORES.
-    _STORE_ALIASES = {
-        "silverburn": "Glasgow Silverburn",
-    }
+        The canonical list lives in ``data/known_stores.json`` (editable in-app
+        via the sidebar) and falls back to ``store_registry`` defaults. It is read
+        per-instance: extractors are rebuilt on every run (``get_extractors`` is
+        not cached), so a saved edit takes effect on the next Process. A candidate
+        store is only shown if it snaps to one of these names; otherwise "" is
+        returned and the card shows "Store: Unknown".
+        """
+        super().__init__()
+        self._known_stores = store_registry.load_stores()
+        self._store_aliases = store_registry.load_aliases()
 
     @staticmethod
     def _norm_words(s: str) -> list:
@@ -373,7 +344,7 @@ class GenericExtractor(BaseExtractor):
     def _clean_town_or_empty(self, candidate: str) -> str:
         """Snap a raw candidate to a known store name, or return "".
 
-        A candidate is only accepted when it matches one of ``_KNOWN_STORES`` —
+        A candidate is only accepted when it matches one of ``self._known_stores`` —
         never a street, building, address blob, or company name. Steps:
 
         1. Strip postcodes and surrounding punctuation/whitespace.
@@ -409,10 +380,10 @@ class GenericExtractor(BaseExtractor):
         # plus alias variants (which carry their canonical display). Longest
         # token-sequence first so the most specific branch (with qualifier) wins
         # over a bare town.
-        matchable = [(s, self._norm_words(s)) for s in self._KNOWN_STORES]
+        matchable = [(s, self._norm_words(s)) for s in self._known_stores]
         matchable += [
             (canonical, self._norm_words(alias))
-            for alias, canonical in self._STORE_ALIASES.items()
+            for alias, canonical in self._store_aliases.items()
         ]
         known = sorted(matchable, key=lambda kv: len(kv[1]), reverse=True)
 
@@ -438,7 +409,7 @@ class GenericExtractor(BaseExtractor):
         strategies below locate likely store text in priority order (the
         explicit "Menkind - <Store>" label first, boilerplate last); every
         candidate is passed through ``_clean_town_or_empty``, which only accepts
-        it if it snaps to a real store in ``_KNOWN_STORES``. Street fragments,
+        it if it snaps to a real store in ``self._known_stores``. Street fragments,
         building names, address blobs, company words, and unknown towns are
         therefore rejected rather than shown as a store.
         """

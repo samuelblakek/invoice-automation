@@ -62,18 +62,25 @@ cross-sheet matching · `40c01d1` invoice-number + amount/glyph fixes.
 4. UI work: `design-system/SPEC.md` is the token source of truth — add a `:root`
    token + spec entry rather than hardcoding, and use the QA checklist at the
    bottom of `SPEC.md` as a self-review.
-5. **Next feature on deck:** make the store list (`_KNOWN_STORES`) editable in-app
-   — JSON-backed sidebar like nominal codes (touches `web_app.py`; own branch).
+5. **Next piece of work:** persistence overhaul for the editable config lists —
+   in-app edits to **nominal codes** and **store names** don't survive a redeploy
+   (Streamlit Cloud's filesystem is ephemeral), so a team-editable list needs an
+   external store (Google Sheets / Supabase, or move host). Also: optimise/improve
+   the sidebar generally. To be brainstormed before building.
 6. Still outstanding: enable the access password (one-line secret in Streamlit Cloud).
 
 ## Known Limitations / Open Items
 
 - **Access password is inactive** until `app_password` is set in Streamlit Cloud
   secrets — the deployed app is currently open to anyone with the link.
-- **Store list is static** — `_KNOWN_STORES` in `generic_extractor.py` is sourced
-  from the workbook but hardcoded. If a genuine store ever shows "Store: Unknown",
-  add/correct it there (one line); a real invoice town that isn't a Menkind store
-  correctly returns "" rather than guessing.
+- **In-app config edits don't persist** — both `data/nominal_codes.json` and
+  `data/known_stores.json` are written to a local file, but Streamlit Cloud's
+  filesystem is ephemeral, so sidebar edits reset on redeploy. Durable changes
+  are made by editing the JSON in the repo (the "Store Names" UI says to contact
+  Samuel). A proper persistence backend is the next planned work.
+- **Store list** — recognised stores live in `data/known_stores.json` (registry
+  defaults are the fallback). A real invoice town that isn't a Menkind store
+  correctly returns "" ("Store: Unknown") rather than guessing.
 - New suppliers need entries in `utils/supplier_registry.py`, `SheetSelector`,
   and the nominal-code mapping.
 - Parsing is regex/label-based on flattened pdfplumber text — new supplier

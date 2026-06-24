@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-06-24 — Store list moved to editable JSON (registry)
+
+- The recognised-store list moved from a hardcoded constant in
+  `generic_extractor.py` to `data/known_stores.json`, loaded via a new
+  `invoice_automation/utils/store_registry.py` (single source of truth, with the
+  62 canonical names + alias map as defaults/fallback). The extractor reads it
+  per-instance, so edits take effect on the next Process.
+- Sidebar gained a "Store Names" section (an `st.data_editor` table). **Known
+  limitation:** Streamlit Cloud's filesystem is ephemeral, so in-app edits don't
+  persist across redeploys — the section carries a note to contact Samuel, and
+  durable changes are made by editing `data/known_stores.json` in the repo. The
+  same limitation applies to `data/nominal_codes.json`; a persistence overhaul
+  for both is the next piece of work.
+- Added `tests/test_store_registry.py` (load/save round-trip, case-insensitive
+  dedupe, blank-drop, missing/corrupt-file fallback, alias preservation).
+
 ## 2026-06-23 — Design system, UI refinement, accurate store extraction
 
 Shipped to `main` (live). Commits `f86d042`, `eafa65a`, `06a651c`.

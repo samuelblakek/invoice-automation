@@ -28,6 +28,7 @@ from invoice_automation.models import ValidationResult
 from invoice_automation.utils.supplier_registry import (
     identify_supplier as identify_supplier_from_text,
 )
+from invoice_automation.utils import store_registry
 from invoice_automation.reports.report_generator import ReportGenerator
 
 logger = logging.getLogger(__name__)
@@ -700,6 +701,12 @@ with st.sidebar:
 
     nom_gen = st.session_state.get("nom_input_gen", 0)
 
+    # --- Recognised store names (backed by data/known_stores.json) ---
+    if "known_stores" not in st.session_state:
+        st.session_state["known_stores"] = store_registry.load_stores()
+
+    store_gen = st.session_state.get("store_input_gen", 0)
+
     with st.expander("Supplier Nominal Codes"):
         # Show feedback from previous action
         nom_msg = st.session_state.pop("nom_feedback", None)
@@ -774,6 +781,45 @@ with st.sidebar:
                 st.session_state["nom_feedback"] = f"Removed {del_choice}"
                 st.rerun()
 
+    with st.expander("Store Names"):
+        store_msg = st.session_state.pop("store_feedback", None)
+        if store_msg:
+            st.success(store_msg)
+        st.info(
+            "To add or correct a store name, **contact Samuel**. Edits made here "
+            "are temporary — they reset when the app next updates — so they don't "
+            "carry over for the team."
+        )
+        st.caption(
+            "Stores the app currently recognises on invoices. An invoice whose "
+            "store isn't on this list shows “Store: Unknown” (it still matches on "
+            "its PO)."
+        )
+        edited_stores = st.data_editor(
+            [{"Store": s} for s in st.session_state["known_stores"]],
+            num_rows="dynamic",
+            use_container_width=True,
+            hide_index=True,
+            key=f"store_editor_{store_gen}",
+            column_config={
+                "Store": st.column_config.TextColumn(
+                    "Store", required=True, help="Canonical store name as it should display"
+                ),
+            },
+        )
+        if st.button("Save store list", use_container_width=True, key="save_stores"):
+            names = [
+                str(r.get("Store", "")).strip()
+                for r in edited_stores
+                if str(r.get("Store", "")).strip()
+            ]
+            store_registry.save_stores(names)
+            st.session_state["known_stores"] = store_registry.load_stores()
+            st.session_state["store_input_gen"] = store_gen + 1
+            count = len(st.session_state["known_stores"])
+            st.session_state["store_feedback"] = f"Saved {count} stores"
+            st.rerun()
+
     st.markdown("")
     all_files_uploaded = bool(invoice_pdfs and maintenance_po)
     process_button = st.button(
@@ -834,6 +880,7 @@ nominal codes, and updates the Maintenance PO spreadsheet automatically.
         st.session_state.clear()
         st.session_state["upload_gen"] = next_gen
         st.session_state["nominal_mapping_rows"] = load_nominal_codes_from_disk()
+        st.session_state["known_stores"] = store_registry.load_stores()
         st.rerun()
 
 
