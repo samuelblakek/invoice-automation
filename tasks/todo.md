@@ -7,6 +7,18 @@
       Settings → Secrets, add `app_password = "..."`. Until then the deployed app
       is open to anyone with the link. (See `.streamlit/secrets.toml.example`.)
 
+## Action Required (next)
+
+- [ ] **Persistent storage for the editable config lists (nominal codes + store names)**
+      — currently both are read-only in the app ("contact Samuel"), because edits to
+      `data/nominal_codes.json` / `data/known_stores.json` are wiped on Streamlit Cloud
+      redeploys (ephemeral filesystem). To make them genuinely team-editable, move the
+      backing store off the local filesystem. Options discussed: Google Sheets
+      (`st-gsheets-connection`, also editable in a spreadsheet), Supabase (free Postgres),
+      GitHub commit-back, or moving host to one with a persistent volume. Recommended:
+      Google Sheets. Brainstorm/spec before building. Pairs with a general sidebar
+      polish (the config editors felt fiddly/unpolished).
+
 ## Possible Future Work
 
 - [ ] Per-user login via `st.login` (OIDC / Google `@giftuniverse.com`) instead of a shared password

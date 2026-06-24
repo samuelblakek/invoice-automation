@@ -699,126 +699,52 @@ with st.sidebar:
     if "nominal_mapping_rows" not in st.session_state:
         st.session_state["nominal_mapping_rows"] = load_nominal_codes_from_disk()
 
-    nom_gen = st.session_state.get("nom_input_gen", 0)
-
     # --- Recognised store names (backed by data/known_stores.json) ---
     if "known_stores" not in st.session_state:
         st.session_state["known_stores"] = store_registry.load_stores()
 
-    store_gen = st.session_state.get("store_input_gen", 0)
-
+    # Both lists are read-only in the app: edits don't persist on Streamlit Cloud
+    # (ephemeral filesystem), so they are maintained in the repo. Durable
+    # persistence is a tracked todo (see tasks/todo.md).
     with st.expander("Supplier Nominal Codes"):
-        # Show feedback from previous action
-        nom_msg = st.session_state.pop("nom_feedback", None)
-        if nom_msg:
-            st.success(nom_msg)
-
+        st.info("To add or change a nominal code, **contact Samuel**.")
         rows = st.session_state["nominal_mapping_rows"]
-        scroll_to_bottom = st.session_state.pop("nom_scroll_bottom", False)
         if rows:
             list_html = "".join(
                 f'<div style="padding:0.3rem 0;border-bottom:1px solid var(--border-subtle)">'
-                f'<div style="color:var(--text-primary);font-size:0.82rem">{r["Supplier"]}</div>'
-                f'<div style="color:var(--text-muted);font-size:0.75rem">{r["Nominal Code"]}</div>'
+                f'<div style="color:var(--text-primary);font-size:0.82rem">{html.escape(str(r["Supplier"]))}</div>'
+                f'<div style="color:var(--text-muted);font-size:0.75rem">{html.escape(str(r["Nominal Code"]))}</div>'
                 f"</div>"
                 for r in rows
             )
-            scroll_js = ""
-            if scroll_to_bottom:
-                scroll_js = '<script>var el=document.getElementById("nom-list");if(el)el.scrollTop=el.scrollHeight;</script>'
             st.markdown(
-                f'<div id="nom-list" style="max-height:260px;overflow-y:auto;border:1px solid var(--border-medium);border-radius:6px;padding:0.4rem 0.6rem;margin-bottom:0.75rem">{list_html}</div>{scroll_js}',
+                f'<div style="max-height:260px;overflow-y:auto;border:1px solid var(--border-medium);border-radius:6px;padding:0.4rem 0.6rem">{list_html}</div>',
                 unsafe_allow_html=True,
             )
         else:
             st.caption("No mappings configured")
 
-        # Add new entry
-        new_supplier = st.text_input(
-            "Supplier",
-            key=f"new_nom_supplier_{nom_gen}",
-            placeholder="e.g. Lamp Shop Online",
-        )
-        new_code = st.text_input(
-            "Nominal Code",
-            key=f"new_nom_code_{nom_gen}",
-            placeholder="e.g. 7820 Stores Repairs",
-        )
-        if st.button(
-            "Add",
-            use_container_width=True,
-            key="add_nominal",
-            disabled=not (new_supplier and new_code),
-        ):
-            added_name = new_supplier.strip()
-            st.session_state["nominal_mapping_rows"].append(
-                {"Supplier": added_name, "Nominal Code": new_code.strip()}
-            )
-            save_nominal_codes_to_disk(st.session_state["nominal_mapping_rows"])
-            st.session_state["nom_input_gen"] = nom_gen + 1
-            st.session_state["nom_feedback"] = f"Added {added_name}"
-            st.session_state["nom_scroll_bottom"] = True
-            st.rerun()
-
-        # Delete entry
-        if rows:
-            del_options = [r["Supplier"] for r in rows]
-            del_choice = st.selectbox(
-                "Remove supplier",
-                del_options,
-                index=None,
-                placeholder="Select to remove...",
-                key=f"del_nominal_select_{nom_gen}",
-            )
-            if del_choice and st.button(
-                "Remove", use_container_width=True, key="del_nominal"
-            ):
-                st.session_state["nominal_mapping_rows"] = [
-                    r for r in rows if r["Supplier"] != del_choice
-                ]
-                save_nominal_codes_to_disk(st.session_state["nominal_mapping_rows"])
-                st.session_state["nom_input_gen"] = nom_gen + 1
-                st.session_state["nom_feedback"] = f"Removed {del_choice}"
-                st.rerun()
-
     with st.expander("Store Names"):
-        store_msg = st.session_state.pop("store_feedback", None)
-        if store_msg:
-            st.success(store_msg)
-        st.info(
-            "To add or correct a store name, **contact Samuel**. Edits made here "
-            "are temporary — they reset when the app next updates — so they don't "
-            "carry over for the team."
-        )
+        st.info("To add or correct a store name, **contact Samuel**.")
         st.caption(
             "Stores the app currently recognises on invoices. An invoice whose "
             "store isn't on this list shows “Store: Unknown” (it still matches on "
             "its PO)."
         )
-        edited_stores = st.data_editor(
-            [{"Store": s} for s in st.session_state["known_stores"]],
-            num_rows="dynamic",
-            use_container_width=True,
-            hide_index=True,
-            key=f"store_editor_{store_gen}",
-            column_config={
-                "Store": st.column_config.TextColumn(
-                    "Store", required=True, help="Canonical store name as it should display"
-                ),
-            },
-        )
-        if st.button("Save store list", use_container_width=True, key="save_stores"):
-            names = [
-                str(r.get("Store", "")).strip()
-                for r in edited_stores
-                if str(r.get("Store", "")).strip()
-            ]
-            store_registry.save_stores(names)
-            st.session_state["known_stores"] = store_registry.load_stores()
-            st.session_state["store_input_gen"] = store_gen + 1
-            count = len(st.session_state["known_stores"])
-            st.session_state["store_feedback"] = f"Saved {count} stores"
-            st.rerun()
+        stores = st.session_state["known_stores"]
+        if stores:
+            store_list_html = "".join(
+                f'<div style="padding:0.25rem 0;border-bottom:1px solid '
+                f'var(--border-subtle);color:var(--text-primary);font-size:0.82rem">'
+                f"{html.escape(str(s))}</div>"
+                for s in stores
+            )
+            st.markdown(
+                f'<div style="max-height:260px;overflow-y:auto;border:1px solid var(--border-medium);border-radius:6px;padding:0.4rem 0.6rem">{store_list_html}</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.caption("No stores configured")
 
     st.markdown("")
     all_files_uploaded = bool(invoice_pdfs and maintenance_po)

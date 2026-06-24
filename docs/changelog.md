@@ -15,6 +15,10 @@
   for both is the next piece of work.
 - Added `tests/test_store_registry.py` (load/save round-trip, case-insensitive
   dedupe, blank-drop, missing/corrupt-file fallback, alias preservation).
+- **Follow-up (same day):** both config sections (Supplier Nominal Codes + Store
+  Names) were made **read-only** — a "contact Samuel" note plus a read-only list —
+  since in-app edits don't persist on Streamlit Cloud. The editable UI was
+  removed until a persistent backend lands (tracked in `tasks/todo.md`).
 
 ## 2026-06-23 — Design system, UI refinement, accurate store extraction
 
