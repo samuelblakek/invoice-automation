@@ -710,12 +710,17 @@ with st.sidebar:
         st.info("To add or change a nominal code, **contact Samuel**.")
         rows = st.session_state["nominal_mapping_rows"]
         if rows:
+            # Display-only alphabetical sort by supplier (case-insensitive); does
+            # not reorder the underlying data, so lookup/matching is unaffected.
+            sorted_rows = sorted(
+                rows, key=lambda r: str(r.get("Supplier", "")).lower()
+            )
             list_html = "".join(
                 f'<div style="padding:0.3rem 0;border-bottom:1px solid var(--border-subtle)">'
                 f'<div style="color:var(--text-primary);font-size:0.82rem">{html.escape(str(r["Supplier"]))}</div>'
                 f'<div style="color:var(--text-muted);font-size:0.75rem">{html.escape(str(r["Nominal Code"]))}</div>'
                 f"</div>"
-                for r in rows
+                for r in sorted_rows
             )
             st.markdown(
                 f'<div style="max-height:260px;overflow-y:auto;border:1px solid var(--border-medium);border-radius:6px;padding:0.4rem 0.6rem">{list_html}</div>',
