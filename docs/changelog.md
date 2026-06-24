@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-06-24 — Matching guardrail, all-extractor store validation, UTF-8 fix, sidebar polish
+
+Shipped to `main` (live). Commits `98feb16`, `3fe1fe3`, `3612bfe`, `c67f94d`, `8a7c3ca`.
+
+- **PO matching guardrail** (`c67f94d`): a PO-less invoice's fuzzy
+  store+supplier+amount hit is now a *guess* — recorded as a reviewable `PO Match`
+  ERROR and routed to **Needs Review** (never auto-Matched), with explicit
+  "verify the PO before approving" messaging. Exact-PO and invoice-number matches
+  still auto-Match; a stated-but-missing PO still fails. Confirmed there is **no
+  similar/substring PO-number matching** anywhere (PO match is exact-per-line; the
+  fuzzy score uses store/supplier/amount, never the PO).
+- **Store validation for all extractors** (`8a7c3ca`): the store-name check moved
+  to a single shared `store_registry.clean_store()` applied at the routing
+  chokepoint (`web_app.extract_invoice`), so the legacy CJL/AAW/APS/Amazon
+  extractors are validated too (previously only the generic one was). E.g. CJL's
+  "31 Eden Centre Newlands Meadow High Wycombe" → "High Wycombe"; unrecognised →
+  "Store: Unknown". Added `clean_store` tests.
+- **UTF-8 file writes** (`3612bfe`): `open(path, "w")` defaulted to cp1252 on
+  Windows and crashed `save_detailed_report` on the `✓` symbol. All report/config
+  writes now set `encoding="utf-8"`. Linux/live wasn't affected. Regression test
+  added.
+- **Sidebar polish:** combined the About + Help expanders into one concise
+  "About & Help" section and corrected the inaccurate "processed locally in your
+  browser" claim (`3fe1fe3`); alphabetised the Supplier Nominal Codes list
+  (display-only) (`98feb16`).
+
 ## 2026-06-24 — Store list moved to editable JSON (registry)
 
 - The recognised-store list moved from a hardcoded constant in
