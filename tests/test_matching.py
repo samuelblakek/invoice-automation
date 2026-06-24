@@ -102,11 +102,15 @@ def test_substring_po_does_not_match_longer_po():
     assert rec is None
 
 
-def test_poless_invoice_uses_fuzzy():
-    # No PO on the invoice — fuzzy store/supplier/amount scoring is allowed.
-    rec, vals = POMatcher(_reader()).find_po_record(_inv(po="", store="Trafford"))
-    assert rec is not None and rec.po_number == "OT0402"
-    assert any(v.check_name == "PO Number Warning" for v in vals)
+def test_poless_invoice_fuzzy_goes_to_review_not_auto():
+    # No PO on the invoice: fuzzy store/supplier/amount scoring still finds a
+    # candidate, but it is a GUESS — it must never auto-update. It lands in
+    # Needs Review with clear messaging so a human confirms the PO.
+    result = InvoiceValidator(_reader()).validate(_inv(po="", store="Trafford"))
+    assert result.po_record is not None and result.po_record.po_number == "OT0402"
+    assert not result.can_auto_update
+    assert result.needs_review
+    assert any("NEEDS REVIEW" in e for e in result.errors)
 
 
 def test_amount_reconciliation_blocks_auto_update():

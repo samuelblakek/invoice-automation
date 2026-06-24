@@ -134,19 +134,6 @@ class POMatcher:
         best_record, best_score = candidates[0]
 
         if best_score >= self.FUZZY_MATCH_THRESHOLD:
-            validations.append(
-                Validation(
-                    check_name="PO Match",
-                    passed=True,
-                    expected="Matching PO record",
-                    actual=f"Found PO '{best_record.po_number}' in {sheet_name} (Strategy 3: fuzzy match, score={best_score:.1f}, no PO on invoice)",
-                    severity=ValidationSeverity.WARNING
-                    if best_score < 60
-                    else ValidationSeverity.INFO,
-                    message=f"Fuzzy matched to PO '{best_record.po_number}' in '{sheet_name}' (store='{best_record.store}', score={best_score:.1f})",
-                )
-            )
-
             match_fields = []
             if invoice.has_store:
                 match_fields.append(f"store '{invoice.store_location}'")
@@ -155,14 +142,24 @@ class POMatcher:
             if invoice.net_amount > 0:
                 match_fields.append(f"amount £{invoice.net_amount:.2f}")
             fields_str = ", ".join(match_fields) if match_fields else "available fields"
+            # No PO number on the invoice: this is a best-GUESS match, never an
+            # auto-update. Real matching is on the PO number; without one we surface
+            # a candidate for a human to confirm. Severity ERROR blocks
+            # can_auto_update; check_name "PO Match" keeps it in the reviewable set
+            # (see ValidationResult.needs_review), so it lands in Needs Review.
             validations.append(
                 Validation(
-                    check_name="PO Number Warning",
+                    check_name="PO Match",
                     passed=False,
-                    expected="PO number on invoice",
-                    actual="No PO found on invoice",
-                    severity=ValidationSeverity.WARNING,
-                    message=f"No PO number on invoice — matched to PO '{best_record.po_number}' using {fields_str}",
+                    expected="A PO number printed on the invoice",
+                    actual=f"No PO on invoice; closest guess is PO '{best_record.po_number}' (score={best_score:.1f})",
+                    severity=ValidationSeverity.ERROR,
+                    message=(
+                        f"NEEDS REVIEW — no PO number on this invoice. Best guess is "
+                        f"PO '{best_record.po_number}' ({best_record.store}), matched only by "
+                        f"{fields_str}. This is NOT a confirmed PO match: check it is the "
+                        f"correct order before approving."
+                    ),
                 )
             )
 
