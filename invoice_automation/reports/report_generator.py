@@ -80,7 +80,7 @@ class ReportGenerator:
         """
         import csv
 
-        with open(output_path, "w", newline="") as f:
+        with open(output_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(
                 [
@@ -168,5 +168,5 @@ class ReportGenerator:
 
             lines.append("")
 
-        with open(output_path, "w") as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             f.write("\n".join(lines))

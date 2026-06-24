@@ -563,7 +563,7 @@ def load_nominal_codes_from_disk() -> list[dict]:
     if not NOMINAL_CODES_PATH.exists():
         return []
     try:
-        with open(NOMINAL_CODES_PATH) as f:
+        with open(NOMINAL_CODES_PATH, encoding="utf-8") as f:
             return json.load(f)
     except (json.JSONDecodeError, OSError) as exc:
         st.warning(f"Could not load nominal codes: {exc}")
@@ -574,7 +574,7 @@ def save_nominal_codes_to_disk(rows: list[dict]) -> None:
     """Persist supplier→nominal code mapping to JSON file."""
     try:
         NOMINAL_CODES_PATH.parent.mkdir(exist_ok=True)
-        with open(NOMINAL_CODES_PATH, "w") as f:
+        with open(NOMINAL_CODES_PATH, "w", encoding="utf-8") as f:
             json.dump(rows, f, indent=2)
     except OSError as exc:
         st.error(f"Could not save nominal codes: {exc}")
