@@ -619,7 +619,16 @@ def extract_invoice(pdf_path: Path):
     supplier_type = identify_supplier(pdf_path, first_page_text)
     extractors = get_extractors()
     extractor = extractors.get(supplier_type, extractors["GENERIC"])
-    return extractor.extract(pdf_path)
+    invoice = extractor.extract(pdf_path)
+
+    # Validate the store name for EVERY extractor's output. The generic extractor
+    # already validates internally (so this is idempotent for it); the legacy
+    # supplier-specific extractors (CJL/AAW/APS/Amazon) do not, so this is where
+    # their raw store text (e.g. "31 Eden Centre Newlands Meadow High Wycombe")
+    # is snapped to a real store or blanked to "" → shown as "Store: Unknown".
+    if invoice is not None and getattr(invoice, "store_location", ""):
+        invoice.store_location = store_registry.clean_store(invoice.store_location)
+    return invoice
 
 
 # ---------------------------------------------------------------------------

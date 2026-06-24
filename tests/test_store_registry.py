@@ -72,6 +72,44 @@ def test_save_preserves_aliases():
         assert data["aliases"] == sr.DEFAULT_ALIASES
 
 
+# --- clean_store: shared store-name validation (used by every extractor) ---
+
+def test_clean_store_exact_known():
+    assert sr.clean_store("Trafford", ["Trafford"], {}) == "Trafford"
+
+
+def test_clean_store_extracts_real_store_from_address_blob():
+    # The CJL case: a merged address line that embeds a real store town.
+    out = sr.clean_store(
+        "31 Eden Centre Newlands Meadow High Wycombe", ["High Wycombe"], {}
+    )
+    assert out == "High Wycombe"
+
+
+def test_clean_store_rejects_street_with_no_known_store():
+    assert sr.clean_store("Kings Inch Road", ["Braehead", "High Wycombe"], {}) == ""
+
+
+def test_clean_store_longest_match_wins():
+    out = sr.clean_store("Menkind Glasgow Fort Unit 4", ["Glasgow Fort", "Trafford"], {})
+    assert out == "Glasgow Fort"
+
+
+def test_clean_store_alias_resolves_to_canonical():
+    out = sr.clean_store(
+        "Silverburn", ["Glasgow Silverburn"], {"silverburn": "Glasgow Silverburn"}
+    )
+    assert out == "Glasgow Silverburn"
+
+
+def test_clean_store_strips_postcode():
+    assert sr.clean_store("Reading RG1 1AA", ["Reading"], {}) == "Reading"
+
+
+def test_clean_store_empty_input():
+    assert sr.clean_store("", ["Trafford"], {}) == ""
+
+
 if __name__ == "__main__":
     import sys
 

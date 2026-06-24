@@ -336,71 +336,16 @@ class GenericExtractor(BaseExtractor):
         self._known_stores = store_registry.load_stores()
         self._store_aliases = store_registry.load_aliases()
 
-    @staticmethod
-    def _norm_words(s: str) -> list:
-        """Lower-cased word tokens of a string (letters/apostrophes only)."""
-        return re.findall(r"[a-z']+", s.lower())
-
     def _clean_town_or_empty(self, candidate: str) -> str:
         """Snap a raw candidate to a known store name, or return "".
 
-        A candidate is only accepted when it matches one of ``self._known_stores`` —
-        never a street, building, address blob, or company name. Steps:
-
-        1. Strip postcodes and surrounding punctuation/whitespace.
-        2. Exact (whole-string) match against a known store → return canonical.
-        3. Otherwise find the longest known store name that appears as a
-           contiguous run of words inside the candidate and snap to it. This
-           recovers the real store from a noisy/merged line such as
-           "Menkind Glasgow Fort Unit 4" → "Glasgow Fort", while a street blob
-           like "31 Eden Centre Newlands Meadow High Wycombe" only matches its
-           genuine store token if one is present.
-        4. No known store found → "". "If the app is not sure, no store is shown."
-
-        Longest-first matching means "Glasgow Fort" beats a bare "Glasgow" and
-        "Bluewater Upper" beats "Bluewater".
+        Thin wrapper over the shared ``store_registry.clean_store`` (the single
+        source of store-name validation), passing this instance's loaded store
+        list and alias map so the JSON isn't re-read per call.
         """
-        if not candidate:
-            return ""
-
-        # Strip UK postcodes and tidy punctuation/whitespace.
-        cleaned = re.sub(
-            r"[A-Z]{1,2}\d{1,2}[A-Z]?\s*\d[A-Z]{2}", "", candidate, flags=re.IGNORECASE
+        return store_registry.clean_store(
+            candidate, self._known_stores, self._store_aliases
         )
-        cleaned = cleaned.strip(" \t,.-–—/").strip()
-        cleaned = " ".join(cleaned.split())
-        if not cleaned:
-            return ""
-
-        words = self._norm_words(cleaned)
-        if not words:
-            return ""
-
-        # Matchable names as (canonical-display, word-tokens): the known stores
-        # plus alias variants (which carry their canonical display). Longest
-        # token-sequence first so the most specific branch (with qualifier) wins
-        # over a bare town.
-        matchable = [(s, self._norm_words(s)) for s in self._known_stores]
-        matchable += [
-            (canonical, self._norm_words(alias))
-            for alias, canonical in self._store_aliases.items()
-        ]
-        known = sorted(matchable, key=lambda kv: len(kv[1]), reverse=True)
-
-        # 2. Exact whole-string match.
-        for canonical, ktokens in known:
-            if words == ktokens:
-                return canonical
-
-        # 3. Contiguous-subsequence match anywhere in the candidate.
-        for canonical, ktokens in known:
-            n = len(ktokens)
-            for i in range(len(words) - n + 1):
-                if words[i : i + n] == ktokens:
-                    return canonical
-
-        # 4. Not a known store → no store shown.
-        return ""
 
     def _extract_store_location(self, text: str) -> str:
         """Extract the store name from invoice text using generic patterns.
